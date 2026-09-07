@@ -248,6 +248,14 @@ function HMenu:Create(options)
     local state = {}
     local activeButton, activeCategory
     local navButtons = {}
+    local activeDropdownPopup
+
+    local function closeDropdown()
+        if activeDropdownPopup then
+            activeDropdownPopup:Destroy()
+            activeDropdownPopup = nil
+        end
+    end
 
     local function fire(control, value)
         state[control.Id or control.Label] = value
@@ -363,10 +371,69 @@ function HMenu:Create(options)
         connect(button.MouseButton1Click, function()
             local current = choices[index]
             choices = readChoices()
-            index = table.find(choices, current) or 0
-            index = index % #choices + 1
-            button.Text = tostring(choices[index]) .. "  v"
-            fire(control, choices[index])
+            if not control.UseList then
+                index = table.find(choices, current) or 0
+                index = index % #choices + 1
+                button.Text = tostring(choices[index]) .. "  v"
+                fire(control, choices[index])
+                return
+            end
+            index = table.find(choices, current) or 1
+
+            if activeDropdownPopup then
+                closeDropdown()
+                button.Text = tostring(choices[index]) .. "  v"
+                return
+            end
+
+            button.Text = tostring(choices[index]) .. "  ^"
+            local optionCount = math.max(#choices, 1)
+            local popup = make("Frame", {
+                Name = "DropdownPopup",
+                Position = UDim2.fromOffset(button.AbsolutePosition.X, button.AbsolutePosition.Y + button.AbsoluteSize.Y + 4),
+                Size = UDim2.fromOffset(button.AbsoluteSize.X, math.min(optionCount * 29 + 8, 182)),
+                BackgroundColor3 = Theme.WindowDark,
+                BackgroundTransparency = 0.03,
+                BorderSizePixel = 0,
+                ZIndex = 80,
+            }, gui)
+            activeDropdownPopup = popup
+            round(popup, 7)
+            stroke(popup, Theme.Border, 0.2)
+
+            local list = make("ScrollingFrame", {
+                Size = UDim2.new(1, -8, 1, -8), Position = UDim2.fromOffset(4, 4),
+                BackgroundTransparency = 1, BorderSizePixel = 0,
+                CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y,
+                ScrollBarThickness = 2, ScrollBarImageColor3 = Theme.Border,
+                ZIndex = 81,
+            }, popup)
+            make("UIListLayout", { Padding = UDim.new(0, 2), SortOrder = Enum.SortOrder.LayoutOrder }, list)
+
+            for optionIndex, option in ipairs(choices) do
+                local optionButton = make("TextButton", {
+                    Size = UDim2.new(1, -3, 0, 27), BackgroundColor3 = Theme.Surface,
+                    BackgroundTransparency = option == current and 0.25 or 1,
+                    BorderSizePixel = 0, Text = tostring(option), TextColor3 = option == current and Theme.Text or Theme.Muted,
+                    Font = Enum.Font.Gotham, TextSize = 10, AutoButtonColor = false,
+                    ZIndex = 82, LayoutOrder = optionIndex,
+                }, list)
+                round(optionButton, 5)
+                connect(optionButton.MouseButton1Click, function()
+                    index = optionIndex
+                    button.Text = tostring(option) .. "  v"
+                    fire(control, option)
+                    closeDropdown()
+                end)
+                connect(optionButton.MouseEnter, function()
+                    optionButton.BackgroundTransparency = 0.35
+                    optionButton.TextColor3 = Theme.Text
+                end)
+                connect(optionButton.MouseLeave, function()
+                    optionButton.BackgroundTransparency = optionIndex == index and 0.25 or 1
+                    optionButton.TextColor3 = optionIndex == index and Theme.Text or Theme.Muted
+                end)
+            end
         end)
     end
 
@@ -422,6 +489,7 @@ function HMenu:Create(options)
     end
 
     local function clearPage()
+        closeDropdown()
         for _, child in ipairs(page:GetChildren()) do
             if child ~= pageLayout and not child:IsA("UIPadding") then child:Destroy() end
         end
@@ -551,6 +619,7 @@ function HMenu:Create(options)
 
     local hidden = false
     local function setVisible(visible)
+        if not visible then closeDropdown() end
         hidden = not visible
         root.Visible = visible
     end

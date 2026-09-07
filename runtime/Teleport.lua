@@ -48,7 +48,6 @@ function Teleport:Create(options)
         TeleportRandom = false,
         SavePosition = false,
         LoadPosition = false,
-        TeleportLobby = false,
     }
 
     local overlay = make("ScreenGui", {
@@ -226,14 +225,6 @@ function Teleport:Create(options)
         end
     end
 
-    local function lobbyPart()
-        local lobby = Workspace:FindFirstChild("Lobby", true)
-        if not lobby then return nil end
-        return lobby:FindFirstChild("SpawnPoint", true)
-            or lobby:FindFirstChildWhichIsA("SpawnLocation", true)
-            or lobby:FindFirstChildWhichIsA("BasePart", true)
-    end
-
     function runtime:GetOptions(source)
         if source ~= "Players" then return { "None" } end
         local names = { "Select a player" }
@@ -277,13 +268,6 @@ function Teleport:Create(options)
                 teleportTo(_G.__HMENU_SAVED_CFRAME, "Returned to saved position.")
             else
                 notify("Save a position first.", false)
-            end
-        elseif name == "TeleportLobby" then
-            local part = lobbyPart()
-            if part then
-                teleportTo(part.CFrame * CFrame.new(0, 3, 0), "Teleported to lobby.")
-            else
-                teleportTo(CFrame.new(-109.5, 138, 38), "Teleported to MM2 lobby fallback.")
             end
         end
     end
