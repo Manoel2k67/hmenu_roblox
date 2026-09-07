@@ -24,6 +24,33 @@ Config.Theme = {
     Danger = Color3.fromRGB(255, 112, 124),
 }
 
+-- Lucide line icons published as Roblox image assets.
+Config.Icons = {
+    home = "rbxassetid://7733960981",
+    eye = "rbxassetid://7733774602",
+    target = "rbxassetid://7743872758",
+    player = "rbxassetid://7743871002",
+    farm = "rbxassetid://8997382987",
+    shield = "rbxassetid://7734056411",
+    smile = "rbxassetid://7734059095",
+    navigation = "rbxassetid://7734020989",
+    settings = "rbxassetid://7734053495",
+    atmosphere = "rbxassetid://7733746880",
+    info = "rbxassetid://7733964719",
+    overview = "rbxassetid://7733970318",
+    sliders = "rbxassetid://7734058803",
+    camera = "rbxassetid://7733708692",
+    palette = "rbxassetid://7734021595",
+    refresh = "rbxassetid://7734051052",
+    users = "rbxassetid://7743876054",
+    music = "rbxassetid://7734020554",
+    map = "rbxassetid://7733992424",
+    cloud = "rbxassetid://7733920519",
+    bookmark = "rbxassetid://7733692043",
+    search = "rbxassetid://7734052925",
+    laptop = "rbxassetid://7733965386",
+}
+
 Config.CategoryModules = {
     "categories/Main.lua", "categories/Visuals.lua", "categories/Combat.lua",
     "categories/Player.lua", "categories/Farm.lua", "categories/Whitelist.lua",

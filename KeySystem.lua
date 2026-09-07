@@ -69,14 +69,14 @@ new("UIGradient", {
 
 new("TextLabel", {
     Size = UDim2.new(1, -62, 0, 28), Position = UDim2.fromOffset(22, 17),
-    BackgroundTransparency = 1, Text = "HMenu  •  Access",
+    BackgroundTransparency = 1, Text = "HMenu  |  Access",
     TextColor3 = Color3.fromRGB(239, 244, 255), Font = Enum.Font.GothamMedium,
     TextSize = 15, TextXAlignment = Enum.TextXAlignment.Left,
 }, window)
 local close = new("TextButton", {
     Size = UDim2.fromOffset(30, 30), Position = UDim2.new(1, -42, 0, 12),
-    BackgroundTransparency = 1, Text = "×", TextColor3 = Color3.fromRGB(182, 194, 220),
-    Font = Enum.Font.Gotham, TextSize = 24, AutoButtonColor = false,
+    BackgroundTransparency = 1, Text = "X", TextColor3 = Color3.fromRGB(182, 194, 220),
+    Font = Enum.Font.Gotham, TextSize = 14, AutoButtonColor = false,
 }, window)
 new("Frame", {
     Size = UDim2.new(1, 0, 0, 1), Position = UDim2.fromOffset(0, 55),

@@ -17,7 +17,8 @@ O link precisa apontar para o conteúdo **raw** e não deve ter colchetes de Mar
 - Digite qualquer chave não vazia e clique em **Validar e abrir** ou pressione Enter.
 - Use **RightShift** (o Shift abaixo do Enter) para ocultar e mostrar o menu.
 - Arraste a barra superior para mover a janela.
-- O botão `×` apenas oculta o menu; RightShift abre novamente.
+- O botão `X` apenas oculta o menu; RightShift abre novamente.
+- Clique na bandeira à direita de uma categoria para fixá-la no topo. Clique novamente para devolvê-la à ordem original.
 
 ## Estrutura
 
@@ -34,6 +35,8 @@ categories/            conteúdo de cada página
 Para criar uma categoria, copie um arquivo em `categories/`, altere seus dados e inclua o caminho em `Config.CategoryModules`, dentro de `HMenuConfig.lua`.
 
 Controles disponíveis: `Toggle`, `Slider`, `Dropdown`, `Button` e `Paragraph`. Cada controle pode receber uma função `Callback`; enquanto não houver lógica conectada, os valores permanecem apenas no estado da interface.
+
+Os ícones de linha usam a coleção LucideBlox (`rbxassetid`) e o mapa central fica em `Config.Icons`, dentro de `HMenuConfig.lua`.
 
 Exemplo:
 

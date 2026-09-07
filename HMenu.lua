@@ -45,6 +45,14 @@ function HMenu:Create(options)
     local Config = options.Import("HMenuConfig.lua")
     local Theme = Config.Theme
     local Parent = options.Parent or Players.LocalPlayer:WaitForChild("PlayerGui")
+    local function icon(parent, iconName, properties)
+        properties = properties or {}
+        properties.BackgroundTransparency = 1
+        properties.BorderSizePixel = 0
+        properties.Image = Config.Icons[iconName] or iconName or ""
+        properties.ImageColor3 = properties.ImageColor3 or Theme.Muted
+        return make("ImageLabel", properties, parent)
+    end
     local categories = {}
     for _, path in ipairs(Config.CategoryModules) do
         local ok, category = pcall(options.Import, path)
@@ -87,6 +95,16 @@ function HMenu:Create(options)
         }), Rotation = 135,
     }, root)
     local scale = make("UIScale", { Scale = 1 }, root)
+    local accentLine = make("Frame", {
+        Name = "AccentLine", Size = UDim2.new(1, 0, 0, 2), BackgroundColor3 = Theme.Accent,
+        BorderSizePixel = 0, ZIndex = 8,
+    }, root)
+    make("UIGradient", {
+        Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.22, 0.15),
+            NumberSequenceKeypoint.new(0.78, 0.15), NumberSequenceKeypoint.new(1, 1),
+        }),
+    }, accentLine)
 
     local header = make("Frame", {
         Name = "Header", Size = UDim2.new(1, 0, 0, 54), BackgroundColor3 = Theme.Header,
@@ -97,21 +115,25 @@ function HMenu:Create(options)
         TextColor3 = Theme.Muted, Font = Enum.Font.Gotham, TextSize = 12,
         TextXAlignment = Enum.TextXAlignment.Left,
     })
-    text(header, "▣  Desktop PC", {
-        Size = UDim2.fromOffset(122, 54), Position = UDim2.new(1, -205, 0, 0),
+    icon(header, "laptop", {
+        Size = UDim2.fromOffset(14, 14), Position = UDim2.new(1, -193, 0.5, -7),
+        ImageColor3 = Theme.Dim,
+    })
+    text(header, "Desktop PC", {
+        Size = UDim2.fromOffset(95, 54), Position = UDim2.new(1, -175, 0, 0),
         TextColor3 = Theme.Muted, Font = Enum.Font.Gotham, TextSize = 11,
-        TextXAlignment = Enum.TextXAlignment.Right,
+        TextXAlignment = Enum.TextXAlignment.Left,
     })
 
     local minimize = make("TextButton", {
         Name = "Minimize", Size = UDim2.fromOffset(36, 54), Position = UDim2.new(1, -80, 0, 0),
-        BackgroundTransparency = 1, BorderSizePixel = 0, Text = "—", TextColor3 = Theme.Muted,
+        BackgroundTransparency = 1, BorderSizePixel = 0, Text = "-", TextColor3 = Theme.Muted,
         Font = Enum.Font.Gotham, TextSize = 15, AutoButtonColor = false,
     }, header)
     local close = make("TextButton", {
         Name = "Close", Size = UDim2.fromOffset(38, 54), Position = UDim2.new(1, -42, 0, 0),
-        BackgroundTransparency = 1, BorderSizePixel = 0, Text = "×", TextColor3 = Theme.Muted,
-        Font = Enum.Font.Gotham, TextSize = 24, AutoButtonColor = false,
+        BackgroundTransparency = 1, BorderSizePixel = 0, Text = "X", TextColor3 = Theme.Muted,
+        Font = Enum.Font.Gotham, TextSize = 14, AutoButtonColor = false,
     }, header)
     make("Frame", {
         Size = UDim2.new(1, 0, 0, 1), Position = UDim2.new(0, 0, 1, -1),
@@ -130,31 +152,49 @@ function HMenu:Create(options)
     local search = make("TextBox", {
         Name = "Search", Size = UDim2.new(1, -26, 0, 34), Position = UDim2.fromOffset(13, 12),
         BackgroundColor3 = Theme.Control, BackgroundTransparency = 0.25, BorderSizePixel = 0,
-        Text = "", PlaceholderText = "⌕  Pesquisar...", ClearTextOnFocus = false,
+        Text = "", PlaceholderText = "Pesquisar...", ClearTextOnFocus = false,
         PlaceholderColor3 = Theme.Dim, TextColor3 = Theme.Text, Font = Enum.Font.Gotham,
         TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left,
     }, sidebar)
     round(search, 7)
     stroke(search, Theme.Border, 0.48)
-    pad(search, 11, 11)
+    pad(search, 32, 11)
+    icon(sidebar, "search", {
+        Size = UDim2.fromOffset(14, 14), Position = UDim2.fromOffset(23, 22),
+        ImageColor3 = Theme.Dim, ZIndex = 3,
+    })
 
     local nav = make("ScrollingFrame", {
-        Name = "Navigation", Size = UDim2.new(1, -14, 1, -66), Position = UDim2.fromOffset(7, 58),
+        Name = "Navigation", Size = UDim2.new(1, -14, 1, -89), Position = UDim2.fromOffset(7, 58),
         BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 2,
         ScrollBarImageColor3 = Theme.Border, CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y,
     }, sidebar)
     local navLayout = make("UIListLayout", { Padding = UDim.new(0, 3), SortOrder = Enum.SortOrder.LayoutOrder }, nav)
     pad(nav, 0, 3, 0, 8)
+    text(sidebar, "RIGHTSHIFT  |  MOSTRAR / OCULTAR", {
+        Size = UDim2.new(1, -20, 0, 22), Position = UDim2.new(0, 12, 1, -27),
+        TextColor3 = Theme.Dim, Font = Enum.Font.GothamMedium, TextSize = 8,
+        TextXAlignment = Enum.TextXAlignment.Left,
+    })
 
     local content = make("Frame", {
         Name = "Content", Size = UDim2.new(1, -178, 1, -54), Position = UDim2.fromOffset(178, 54),
         BackgroundTransparency = 1, BorderSizePixel = 0,
     }, root)
+    local titleIcon = icon(content, "home", {
+        Size = UDim2.fromOffset(21, 21), Position = UDim2.fromOffset(25, 26),
+        ImageColor3 = Theme.Accent,
+    })
     local title = text(content, "", {
-        Size = UDim2.new(1, -42, 0, 42), Position = UDim2.fromOffset(26, 16),
+        Size = UDim2.new(1, -70, 0, 42), Position = UDim2.fromOffset(55, 16),
         TextColor3 = Theme.Text, Font = Enum.Font.GothamBold, TextSize = 22,
         TextXAlignment = Enum.TextXAlignment.Left,
     })
+    local titleAccent = make("Frame", {
+        Size = UDim2.fromOffset(34, 2), Position = UDim2.fromOffset(56, 57),
+        BackgroundColor3 = Theme.Accent, BorderSizePixel = 0,
+    }, content)
+    round(titleAccent, 1)
     local page = make("ScrollingFrame", {
         Name = "Page", Size = UDim2.new(1, -39, 1, -76), Position = UDim2.fromOffset(24, 66),
         BackgroundTransparency = 1, BorderSizePixel = 0, CanvasSize = UDim2.new(),
@@ -265,7 +305,7 @@ function HMenu:Create(options)
         local index = table.find(choices, saved == nil and control.Default or saved) or 1
         local button = make("TextButton", {
             Size = UDim2.fromOffset(124, 27), Position = UDim2.new(1, -137, 0.5, -14),
-            BackgroundColor3 = Theme.Control, BorderSizePixel = 0, Text = tostring(choices[index]) .. "  ▾",
+            BackgroundColor3 = Theme.Control, BorderSizePixel = 0, Text = tostring(choices[index]) .. "  v",
             TextColor3 = Theme.Muted, Font = Enum.Font.Gotham, TextSize = 10, AutoButtonColor = false,
         }, row)
         round(button, 5)
@@ -273,7 +313,7 @@ function HMenu:Create(options)
         fire(control, choices[index])
         connect(button.MouseButton1Click, function()
             index = index % #choices + 1
-            button.Text = tostring(choices[index]) .. "  ▾"
+            button.Text = tostring(choices[index]) .. "  v"
             fire(control, choices[index])
         end)
     end
@@ -298,7 +338,7 @@ function HMenu:Create(options)
         local row = make("Frame", {
             Name = control.Id or control.Label, Size = UDim2.new(1, 0, 0, height),
             BackgroundColor3 = Theme.Surface, BackgroundTransparency = 0.17,
-            BorderSizePixel = 0,
+            BorderSizePixel = 0, Active = true,
         }, sectionFrame)
         round(row, 5)
         stroke(row, Theme.Border, 0.6)
@@ -320,6 +360,12 @@ function HMenu:Create(options)
         elseif control.Kind == "Dropdown" then createChoice(control, row)
         elseif control.Kind == "Button" then createAction(control, row)
         end
+        connect(row.MouseEnter, function()
+            TweenService:Create(row, TweenInfo.new(0.12), { BackgroundTransparency = 0.08 }):Play()
+        end)
+        connect(row.MouseLeave, function()
+            TweenService:Create(row, TweenInfo.new(0.12), { BackgroundTransparency = 0.17 }):Play()
+        end)
         return row
     end
 
@@ -332,6 +378,7 @@ function HMenu:Create(options)
     local function render(category)
         activeCategory = category
         title.Text = category.Label
+        titleIcon.Image = Config.Icons[category.Icon] or category.Icon or ""
         clearPage()
         for sectionIndex, section in ipairs(category.Sections or {}) do
             local sectionFrame = make("Frame", {
@@ -339,10 +386,17 @@ function HMenu:Create(options)
                 BackgroundTransparency = 1, LayoutOrder = sectionIndex,
             }, page)
             local layout = make("UIListLayout", { Padding = UDim.new(0, 5), SortOrder = Enum.SortOrder.LayoutOrder }, sectionFrame)
-            text(sectionFrame, (section.Icon or "◇") .. "  " .. section.Title, {
-                Size = UDim2.new(1, 0, 0, 25), TextColor3 = Theme.Text,
+            local sectionHeader = make("Frame", {
+                Name = "SectionHeader", Size = UDim2.new(1, 0, 0, 25),
+                BackgroundTransparency = 1, BorderSizePixel = 0, LayoutOrder = 0,
+            }, sectionFrame)
+            icon(sectionHeader, section.Icon or category.Icon, {
+                Size = UDim2.fromOffset(15, 15), Position = UDim2.fromOffset(1, 4),
+                ImageColor3 = Theme.Muted,
+            })
+            text(sectionHeader, section.Title, {
+                Size = UDim2.new(1, -25, 1, 0), Position = UDim2.fromOffset(24, 0), TextColor3 = Theme.Text,
                 Font = Enum.Font.GothamBold, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left,
-                LayoutOrder = 0,
             })
             for controlIndex, control in ipairs(section.Controls or {}) do
                 local row = createControl(sectionFrame, control)
@@ -354,24 +408,35 @@ function HMenu:Create(options)
 
     local function selectCategory(category, button)
         if activeButton then
-            activeButton.TextColor3 = Theme.Muted
             activeButton.BackgroundTransparency = 1
             local marker = activeButton:FindFirstChild("ActiveMarker")
             if marker then marker.Visible = false end
+            local oldIcon = activeButton:FindFirstChild("CategoryIcon")
+            local oldLabel = activeButton:FindFirstChild("CategoryLabel")
+            if oldIcon then oldIcon.ImageColor3 = Theme.Muted end
+            if oldLabel then oldLabel.TextColor3 = Theme.Muted end
         end
         activeButton, activeCategory = button, category
-        button.TextColor3, button.BackgroundTransparency = Theme.Text, 0.72
+        button.BackgroundTransparency = 0.72
         button.ActiveMarker.Visible = true
+        button.CategoryIcon.ImageColor3 = Theme.Accent
+        button.CategoryLabel.TextColor3 = Theme.Text
         render(category)
+    end
+
+    local function refreshFavoriteOrder()
+        for _, item in pairs(navButtons) do
+            item.Button.LayoutOrder = item.Favorite and item.OriginalIndex or (1000 + item.OriginalIndex)
+            item.FavoriteButton.ImageColor3 = item.Favorite and Theme.Bookmark or Theme.Dim
+            item.FavoriteButton.ImageTransparency = item.Favorite and 0 or 0.12
+        end
     end
 
     for index, category in ipairs(categories) do
         local button = make("TextButton", {
             Name = category.Id, Size = UDim2.new(1, 0, 0, 35), BackgroundColor3 = Theme.Surface,
             BackgroundTransparency = 1, BorderSizePixel = 0,
-            Text = "  " .. (category.Icon or "◇") .. "  " .. category.Label,
-            TextColor3 = Theme.Muted, Font = Enum.Font.Gotham, TextSize = 11,
-            TextXAlignment = Enum.TextXAlignment.Left, AutoButtonColor = false, LayoutOrder = index,
+            Text = "", AutoButtonColor = false, LayoutOrder = index,
         }, nav)
         round(button, 5)
         local marker = make("Frame", {
@@ -379,15 +444,46 @@ function HMenu:Create(options)
             BackgroundColor3 = Theme.Accent, BorderSizePixel = 0, Visible = false,
         }, button)
         round(marker, 2)
-        text(button, category.Bookmarked and "▣" or "□", {
-            Size = UDim2.fromOffset(25, 35), Position = UDim2.new(1, -28, 0, 0),
-            TextColor3 = category.Bookmarked and Theme.Bookmark or Theme.Dim,
-            Font = Enum.Font.GothamBold, TextSize = 15, TextXAlignment = Enum.TextXAlignment.Center,
+        icon(button, category.Icon, {
+            Name = "CategoryIcon",
+            Size = UDim2.fromOffset(15, 15), Position = UDim2.fromOffset(12, 10),
+            ImageColor3 = Theme.Muted, ZIndex = 2,
         })
-        navButtons[category.Id] = { Button = button, Category = category }
+        text(button, category.Label, {
+            Name = "CategoryLabel",
+            Size = UDim2.new(1, -68, 1, 0), Position = UDim2.fromOffset(36, 0),
+            TextColor3 = Theme.Muted, Font = Enum.Font.Gotham, TextSize = 11,
+            TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 2,
+        })
+        local favorite = make("ImageButton", {
+            Name = "Favorite", AnchorPoint = Vector2.new(0.5, 0.5),
+            Size = UDim2.fromOffset(16, 16), Position = UDim2.new(1, -17, 0.5, 0),
+            BackgroundTransparency = 1, BorderSizePixel = 0, Image = Config.Icons.bookmark,
+            ImageColor3 = category.Bookmarked and Theme.Bookmark or Theme.Dim,
+            AutoButtonColor = false, ZIndex = 5,
+        }, button)
+        navButtons[category.Id] = {
+            Button = button, Category = category, FavoriteButton = favorite,
+            Favorite = category.Bookmarked == true, OriginalIndex = index,
+        }
         connect(button.MouseButton1Click, function() selectCategory(category, button) end)
+        connect(button.MouseEnter, function()
+            if activeButton ~= button then TweenService:Create(button, TweenInfo.new(0.12), { BackgroundTransparency = 0.88 }):Play() end
+        end)
+        connect(button.MouseLeave, function()
+            if activeButton ~= button then TweenService:Create(button, TweenInfo.new(0.12), { BackgroundTransparency = 1 }):Play() end
+        end)
+        connect(favorite.MouseButton1Click, function()
+            local item = navButtons[category.Id]
+            item.Favorite = not item.Favorite
+            category.Bookmarked = item.Favorite
+            refreshFavoriteOrder()
+            favorite.Size = UDim2.fromOffset(13, 13)
+            TweenService:Create(favorite, TweenInfo.new(0.14, Enum.EasingStyle.Back), { Size = UDim2.fromOffset(16, 16) }):Play()
+        end)
         if category.Id == Config.DefaultCategory then selectCategory(category, button) end
     end
+    refreshFavoriteOrder()
     if not activeButton then
         local first = navButtons[categories[1].Id]
         selectCategory(first.Category, first.Button)
