@@ -19,16 +19,10 @@ return {
             },
         },
         {
-            Title = "Item ESP",
+            Title = "Items ESP",
             Icon = "map",
             Controls = {
-                { Kind = "Toggle", Setting = "ShowCoins", Id = "show_coins", Label = "Show Coins", Description = "Highlights detected coins in gold.", Default = false },
-            },
-        },
-        {
-            Title = "Dropped Items",
-            Icon = "map",
-            Controls = {
+                { Kind = "Toggle", Setting = "ShowCoins", Id = "show_coins", Label = "Show Coins", Description = "Highlights coins. X-Ray ESP controls visibility through walls.", Default = false },
                 { Kind = "Toggle", Setting = "DroppedGun", Id = "dropped_items", Label = "Show Dropped Gun", Description = "Highlights GunDrop in gold and adds a world label.", Default = false },
             },
         },

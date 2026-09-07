@@ -323,9 +323,13 @@ function Visuals:Create(options)
                             OutlineColor = Color3.fromRGB(255, 248, 185),
                             FillTransparency = 0.5,
                             OutlineTransparency = 0.05,
-                            DepthMode = Enum.HighlightDepthMode.AlwaysOnTop,
+                            DepthMode = settings.XRay and Enum.HighlightDepthMode.AlwaysOnTop
+                                or Enum.HighlightDepthMode.Occluded,
                         }, coin)
                     end
+                    coinVisuals[coin].DepthMode = settings.XRay
+                        and Enum.HighlightDepthMode.AlwaysOnTop
+                        or Enum.HighlightDepthMode.Occluded
                 end
             end
         end
@@ -333,6 +337,16 @@ function Visuals:Create(options)
             if not found[coin] or not coin.Parent then
                 destroy(highlight)
                 coinVisuals[coin] = nil
+            end
+        end
+
+        local function updateCoinDepthModes()
+            local depthMode = settings.XRay and Enum.HighlightDepthMode.AlwaysOnTop
+                or Enum.HighlightDepthMode.Occluded
+            for _, highlight in pairs(coinVisuals) do
+                if highlight and highlight.Parent then
+                    highlight.DepthMode = depthMode
+                end
             end
         end
     end
@@ -487,6 +501,11 @@ function Visuals:Create(options)
             if value then scanGunDrops() else removeAllGunVisuals() end
         elseif name == "ShowCoins" then
             if value then scanCoinVisuals() else removeAllCoinVisuals() end
+        elseif name == "XRay" then
+            updateCoinDepthModes()
+            if settings.EspEnabled then
+                updatePlayers()
+            end
         elseif settings.EspEnabled then
             updatePlayers()
         end
