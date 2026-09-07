@@ -40,8 +40,8 @@ function Misc:Create(options)
 
     local statsLabel = Instance.new("TextLabel")
     statsLabel.Name = "PerformanceStats"
-    statsLabel.AnchorPoint = Vector2.new(1, 0)
-    statsLabel.Position = UDim2.new(1, -12, 0, 12)
+    statsLabel.Position = UDim2.new(1, -12, 1, -12)
+    statsLabel.AnchorPoint = Vector2.new(1, 1)
     statsLabel.Size = UDim2.fromOffset(170, 28)
     statsLabel.BackgroundColor3 = Color3.fromRGB(15, 22, 38)
     statsLabel.BackgroundTransparency = 0.18
