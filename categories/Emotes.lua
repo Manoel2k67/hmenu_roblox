@@ -1,10 +1,11 @@
 return {
     Id = "Emotes", Label = "Emotes", Icon = "smile", Bookmarked = false,
+    RuntimeModule = "runtime/Emotes.lua",
     Sections = {
         { Title = "Animations", Icon = "music", Controls = {
-            { Kind = "Dropdown", Id = "emote", Label = "Selected Emote", Options = { "Wave", "Dance", "Cheer", "Laugh" }, Default = "Wave" },
-            { Kind = "Button", Id = "play_emote", Label = "Preview Emote", ButtonText = "Reproduzir" },
-            { Kind = "Toggle", Id = "loop_emote", Label = "Loop", Default = false },
+            { Kind = "Dropdown", Setting = "SelectedEmote", Id = "emote", Label = "Selected Emote", Options = { "Sit", "Zen", "Dab", "Floss", "Zombie", "Headless" }, Default = "Sit" },
+            { Kind = "Button", Setting = "PlayEmote", Id = "play_emote", Label = "Play Emote", ButtonText = "Reproduzir" },
+            { Kind = "Toggle", Setting = "LoopEmote", Id = "loop_emote", Label = "Loop", Default = false },
         }},
     },
 }
