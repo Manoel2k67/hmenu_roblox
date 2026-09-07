@@ -92,6 +92,12 @@ function HMenu:Create(options)
                     table.insert(runtimes, runtime)
                     for _, section in ipairs(category.Sections or {}) do
                         for _, control in ipairs(section.Controls or {}) do
+                            if control.OptionsSource and type(runtime.GetOptions) == "function" then
+                                local optionsSource = control.OptionsSource
+                                control.Options = function()
+                                    return runtime:GetOptions(optionsSource)
+                                end
+                            end
                             if control.Setting then
                                 local previousCallback = control.Callback
                                 control.Callback = function(value, state)
@@ -332,11 +338,22 @@ function HMenu:Create(options)
     end
 
     local function createChoice(control, row)
-        local choices = control.Options or { "Default" }
+        local function readChoices()
+            local choices = control.Options
+            if type(choices) == "function" then
+                local ok, result = pcall(choices)
+                choices = ok and result or nil
+            end
+            if type(choices) ~= "table" or #choices == 0 then
+                return { "None" }
+            end
+            return choices
+        end
+        local choices = readChoices()
         local saved = state[control.Id or control.Label]
         local index = table.find(choices, saved == nil and control.Default or saved) or 1
         local button = make("TextButton", {
-            Size = UDim2.fromOffset(124, 27), Position = UDim2.new(1, -137, 0.5, -14),
+            Size = UDim2.fromOffset(152, 27), Position = UDim2.new(1, -165, 0.5, -14),
             BackgroundColor3 = Theme.Control, BorderSizePixel = 0, Text = tostring(choices[index]) .. "  v",
             TextColor3 = Theme.Muted, Font = Enum.Font.Gotham, TextSize = 10, AutoButtonColor = false,
         }, row)
@@ -344,6 +361,9 @@ function HMenu:Create(options)
         stroke(button, Theme.Border, 0.55)
         state[control.Id or control.Label] = choices[index]
         connect(button.MouseButton1Click, function()
+            local current = choices[index]
+            choices = readChoices()
+            index = table.find(choices, current) or 0
             index = index % #choices + 1
             button.Text = tostring(choices[index]) .. "  v"
             fire(control, choices[index])
