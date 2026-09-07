@@ -26,15 +26,12 @@ function Farm:Create(options)
     local cleanupFunction
     local farmGeneration = 0
     local actionGeneration = 0
-    local espGeneration = 0
     local actionBusy = false
-    local coinHighlights = {}
     local toastVersion = 0
 
     local settings = {
         AutoCoins = false,
         ReturnAfterSweep = false,
-        CoinESP = false,
         AutoEventItems = false,
         EventFilter = "All",
         MovementMode = "Teleport",
@@ -292,49 +289,6 @@ function Farm:Create(options)
         end)
     end
 
-    local function removeCoinHighlights()
-        for coin, highlight in pairs(coinHighlights) do
-            if highlight then pcall(function() highlight:Destroy() end) end
-            coinHighlights[coin] = nil
-        end
-    end
-
-    local function updateCoinHighlights()
-        local found = {}
-        for _, coin in ipairs(getItems("Coins")) do
-            found[coin] = true
-            if not coinHighlights[coin] then
-                coinHighlights[coin] = make("Highlight", {
-                    Name = "HMenuCoinHighlight", Adornee = coin,
-                    FillColor = Color3.fromRGB(255, 205, 45), OutlineColor = Color3.fromRGB(255, 248, 185),
-                    FillTransparency = 0.5, OutlineTransparency = 0.05,
-                    DepthMode = Enum.HighlightDepthMode.AlwaysOnTop,
-                }, coin)
-            end
-        end
-        for coin, highlight in pairs(coinHighlights) do
-            if not found[coin] or not coin.Parent then
-                if highlight then pcall(function() highlight:Destroy() end) end
-                coinHighlights[coin] = nil
-            end
-        end
-    end
-
-    local function restartCoinESP()
-        espGeneration = espGeneration + 1
-        local generation = espGeneration
-        if not settings.CoinESP then
-            removeCoinHighlights()
-            return
-        end
-        task.spawn(function()
-            while not destroyed and settings.CoinESP and generation == espGeneration do
-                updateCoinHighlights()
-                task.wait(1)
-            end
-        end)
-    end
-
     local function collectNearestCoin()
         if settings.AutoCoins or settings.AutoEventItems or actionBusy then
             notify("Stop the current collection first.", false)
@@ -358,8 +312,6 @@ function Farm:Create(options)
         settings[name] = value
         if name == "AutoCoins" or name == "AutoEventItems" then
             restartAutoFarm()
-        elseif name == "CoinESP" then
-            restartCoinESP()
         elseif name == "NearestCoin" then
             collectNearestCoin()
         elseif name == "CollectAllCoins" then
@@ -374,8 +326,6 @@ function Farm:Create(options)
         destroyed = true
         farmGeneration = farmGeneration + 1
         actionGeneration = actionGeneration + 1
-        espGeneration = espGeneration + 1
-        removeCoinHighlights()
         if overlay and overlay.Parent then overlay:Destroy() end
         if _G.__HMENU_FARM_CLEANUP == cleanupFunction then _G.__HMENU_FARM_CLEANUP = nil end
     end

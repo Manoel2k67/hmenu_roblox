@@ -36,6 +36,7 @@ function Visuals:Create(options)
     local connections = {}
     local playerVisuals = {}
     local gunVisuals = {}
+    local coinVisuals = {}
     local roles = {}
     local destroyed = false
     local roleBusy = false
@@ -50,6 +51,7 @@ function Visuals:Create(options)
         XRay = false,
         FillTransparency = 68,
         DroppedGun = false,
+        ShowCoins = false,
         Fov = 70,
         Crosshair = "Off",
         FullBright = false,
@@ -278,6 +280,63 @@ function Visuals:Create(options)
         for _, instance in ipairs(instances) do removeGunVisual(instance) end
     end
 
+    local function normalizedCoin(part)
+        local name = string.lower(part.Name)
+        local parent = part.Parent
+        if name == "coinvisual" and parent and parent:IsA("BasePart") then
+            return parent
+        end
+        if part:FindFirstChild("CoinVisual") then return part end
+        if name == "coin" or name == "coin_server" or name == "currencycoin" then return part end
+        local current = parent
+        for _ = 1, 4 do
+            if not current or current == Workspace then break end
+            local currentName = string.lower(current.Name)
+            if string.find(currentName, "coincontainer", 1, true) and string.find(name, "coin", 1, true) then
+                return part
+            end
+            current = current.Parent
+        end
+        return nil
+    end
+
+    local function removeAllCoinVisuals()
+        for coin, highlight in pairs(coinVisuals) do
+            destroy(highlight)
+            coinVisuals[coin] = nil
+        end
+    end
+
+    local function scanCoinVisuals()
+        if not settings.ShowCoins then return end
+        local found = {}
+        for _, descendant in ipairs(Workspace:GetDescendants()) do
+            if descendant:IsA("BasePart") then
+                local coin = normalizedCoin(descendant)
+                if coin and coin.Parent then
+                    found[coin] = true
+                    if not coinVisuals[coin] then
+                        coinVisuals[coin] = make("Highlight", {
+                            Name = "HMenuCoinHighlight",
+                            Adornee = coin,
+                            FillColor = Color3.fromRGB(255, 205, 45),
+                            OutlineColor = Color3.fromRGB(255, 248, 185),
+                            FillTransparency = 0.5,
+                            OutlineTransparency = 0.05,
+                            DepthMode = Enum.HighlightDepthMode.AlwaysOnTop,
+                        }, coin)
+                    end
+                end
+            end
+        end
+        for coin, highlight in pairs(coinVisuals) do
+            if not found[coin] or not coin.Parent then
+                destroy(highlight)
+                coinVisuals[coin] = nil
+            end
+        end
+    end
+
     local function addGunVisual(instance)
         if destroyed or not settings.DroppedGun or gunVisuals[instance] or not instance:IsDescendantOf(Workspace) then return end
         local adornee = gunAdornee(instance)
@@ -367,12 +426,13 @@ function Visuals:Create(options)
         end
     end
 
-    local roleElapsed, visualElapsed, gunElapsed = 0, 0, 0
+    local roleElapsed, visualElapsed, gunElapsed, coinElapsed = 0, 0, 0, 0
     connect(RunService.Heartbeat, function(deltaTime)
         if destroyed then return end
         roleElapsed = roleElapsed + deltaTime
         visualElapsed = visualElapsed + deltaTime
         gunElapsed = gunElapsed + deltaTime
+        coinElapsed = coinElapsed + deltaTime
         if settings.EspEnabled and roleElapsed >= 0.75 then
             roleElapsed = 0
             task.spawn(refreshRoles)
@@ -384,6 +444,10 @@ function Visuals:Create(options)
         if settings.DroppedGun and gunElapsed >= 1 then
             gunElapsed = 0
             scanGunDrops()
+        end
+        if settings.ShowCoins and coinElapsed >= 1 then
+            coinElapsed = 0
+            scanCoinVisuals()
         end
         if settings.FullBright then applyFullBright(true) end
         if settings.NoFog then applyNoFog(true) end
@@ -421,6 +485,8 @@ function Visuals:Create(options)
             end
         elseif name == "DroppedGun" then
             if value then scanGunDrops() else removeAllGunVisuals() end
+        elseif name == "ShowCoins" then
+            if value then scanCoinVisuals() else removeAllCoinVisuals() end
         elseif settings.EspEnabled then
             updatePlayers()
         end
@@ -431,6 +497,7 @@ function Visuals:Create(options)
         destroyed = true
         removeAllPlayerVisuals()
         removeAllGunVisuals()
+        removeAllCoinVisuals()
         applyFullBright(false)
         applyNoFog(false)
         camera = Workspace.CurrentCamera

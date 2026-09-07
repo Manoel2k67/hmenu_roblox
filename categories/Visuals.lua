@@ -19,6 +19,13 @@ return {
             },
         },
         {
+            Title = "Item ESP",
+            Icon = "map",
+            Controls = {
+                { Kind = "Toggle", Setting = "ShowCoins", Id = "show_coins", Label = "Show Coins", Description = "Highlights detected coins in gold.", Default = false },
+            },
+        },
+        {
             Title = "Dropped Items",
             Icon = "map",
             Controls = {

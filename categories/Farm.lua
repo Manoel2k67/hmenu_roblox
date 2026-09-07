@@ -13,7 +13,6 @@ return {
                 { Kind = "Button", Setting = "NearestCoin", Id = "nearest_coin", Label = "Teleport to Nearest Coin", ButtonText = "Collect" },
                 { Kind = "Button", Setting = "CollectAllCoins", Id = "collect_all_coins", Label = "Collect All Coins", Description = "Runs through the current coin list once.", ButtonText = "Collect" },
                 { Kind = "Toggle", Setting = "ReturnAfterSweep", Id = "return_after_sweep", Label = "Return After Sweep", Description = "Returns to the starting position after one-time collection.", Default = false },
-                { Kind = "Toggle", Setting = "CoinESP", Id = "coin_esp", Label = "Coin ESP", Description = "Highlights detected coins in gold.", Default = false },
             },
         },
         {
