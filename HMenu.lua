@@ -80,6 +80,38 @@ function HMenu:Create(options)
     }, Parent)
     if type(protect_gui) == "function" then pcall(protect_gui, gui) end
 
+    local runtimes = {}
+    for _, category in ipairs(categories) do
+        if category.RuntimeModule then
+            local ok, runtimeModule = pcall(options.Import, category.RuntimeModule)
+            if ok and type(runtimeModule) == "table" and type(runtimeModule.Create) == "function" then
+                local runtimeOk, runtime = pcall(function()
+                    return runtimeModule:Create({ Parent = Parent })
+                end)
+                if runtimeOk and runtime then
+                    table.insert(runtimes, runtime)
+                    for _, section in ipairs(category.Sections or {}) do
+                        for _, control in ipairs(section.Controls or {}) do
+                            if control.Setting then
+                                local previousCallback = control.Callback
+                                control.Callback = function(value, state)
+                                    runtime:Set(control.Setting, value)
+                                    if type(previousCallback) == "function" then
+                                        previousCallback(value, state)
+                                    end
+                                end
+                            end
+                        end
+                    end
+                else
+                    warn("[HMenu] Runtime não iniciado:", category.RuntimeModule, runtime)
+                end
+            else
+                warn("[HMenu] Runtime não carregado:", category.RuntimeModule, runtimeModule)
+            end
+        end
+    end
+
     local root = make("Frame", {
         Name = "Window", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
         Size = UDim2.fromOffset(Config.Window.Width, Config.Window.Height),
@@ -535,6 +567,10 @@ function HMenu:Create(options)
     updateScale()
 
     local function cleanup()
+        for _, runtime in ipairs(runtimes) do
+            if type(runtime.Destroy) == "function" then pcall(function() runtime:Destroy() end) end
+        end
+        runtimes = {}
         for _, connection in ipairs(connections) do pcall(function() connection:Disconnect() end) end
         connections = {}
         if gui and gui.Parent then gui:Destroy() end

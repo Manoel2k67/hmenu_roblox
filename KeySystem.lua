@@ -12,6 +12,10 @@ local ACCEPT_ANY_NON_EMPTY_KEY = true -- Temporary mock validation.
 local VALID_KEYS = { "HMENU-DEMO" }
 local GET_KEY_URL = "https://discord.gg/seulink"
 
+if type(_G.__HMENU_CLEANUP) == "function" then
+    pcall(_G.__HMENU_CLEANUP)
+end
+
 local function resolveGuiParent()
     if type(gethui) == "function" then
         local ok, result = pcall(gethui)

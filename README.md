@@ -30,6 +30,8 @@ categories/            conteúdo de cada página
   Main.lua
   Visuals.lua
   ...
+runtime/               implementação e limpeza das funções ativas
+  Visuals.lua
 ```
 
 Para criar uma categoria, copie um arquivo em `categories/`, altere seus dados e inclua o caminho em `Config.CategoryModules`, dentro de `HMenuConfig.lua`.
@@ -37,6 +39,8 @@ Para criar uma categoria, copie um arquivo em `categories/`, altere seus dados e
 Controles disponíveis: `Toggle`, `Slider`, `Dropdown`, `Button` e `Paragraph`. Cada controle pode receber uma função `Callback`; enquanto não houver lógica conectada, os valores permanecem apenas no estado da interface.
 
 Os ícones de linha usam a coleção LucideBlox (`rbxassetid`) e o mapa central fica em `Config.Icons`, dentro de `HMenuConfig.lua`.
+
+A categoria `Visuals` está ligada ao módulo `runtime/Visuals.lua`. Ele implementa ESP por papéis do MM2, nomes, distância, vida, GunDrop, FOV, crosshair, Full Bright e remoção de neblina. Ao destruir ou recarregar o menu, o runtime remove seus adornos, desconecta eventos e restaura câmera e iluminação.
 
 Exemplo:
 
