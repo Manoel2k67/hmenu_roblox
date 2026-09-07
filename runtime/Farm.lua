@@ -37,9 +37,8 @@ function Farm:Create(options)
         MovementMode = "Teleport",
         ActionDelay = 0.2,
         SmoothSpeed = 70,
-        FarmWalkSpeed = 32,
+        FarmWalkSpeed = 16,
         NearestCoin = false,
-        CollectAllCoins = false,
         CollectAllEvents = false,
     }
 
@@ -314,8 +313,6 @@ function Farm:Create(options)
             restartAutoFarm()
         elseif name == "NearestCoin" then
             collectNearestCoin()
-        elseif name == "CollectAllCoins" then
-            runSweep("Coins")
         elseif name == "CollectAllEvents" then
             runSweep("Events")
         end
