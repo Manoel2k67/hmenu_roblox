@@ -1,5 +1,5 @@
 -- HMenu bootstrap. Public entry point:
--- loadstring(game:HttpGet("https://raw.githubusercontent.com/Manoel2k67/hmenu_roblox/main/KeySystem.lua"))()
+-- loadstring(game:HttpGet("https://raw.githubusercontent.com/Manoel2k67/hmenu_roblox/main/KeySystem.lua?v=" .. tostring(os.time()), true))()
 
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
@@ -11,6 +11,7 @@ local GUI_NAME = "HMenuKeySystem"
 local ACCEPT_ANY_NON_EMPTY_KEY = true -- Temporary mock validation.
 local VALID_KEYS = { "HMENU-DEMO" }
 local GET_KEY_URL = "https://discord.gg/seulink"
+local CACHE_BUSTER = tostring(os.time()) .. "-" .. tostring(math.random(100000, 999999))
 
 if type(_G.__HMENU_CLEANUP) == "function" then
     pcall(_G.__HMENU_CLEANUP)
@@ -143,7 +144,7 @@ local function validKey(value)
 end
 
 local function import(path)
-    local source = game:HttpGet(REPOSITORY .. path, true)
+    local source = game:HttpGet(REPOSITORY .. path .. "?v=" .. CACHE_BUSTER, true)
     local chunk, compileError = loadstring(source, "@HMenu/" .. path)
     assert(chunk, compileError)
     return chunk()

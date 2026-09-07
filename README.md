@@ -7,10 +7,10 @@ Interface modular em Luau com sistema de chave, navegação por categorias e dad
 Depois que todos os arquivos estiverem na branch `main`, execute:
 
 ```lua
-loadstring(game:HttpGet("https://raw.githubusercontent.com/Manoel2k67/hmenu_roblox/main/KeySystem.lua"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Manoel2k67/hmenu_roblox/main/KeySystem.lua?v=" .. tostring(os.time()), true))()
 ```
 
-O link precisa apontar para o conteúdo **raw** e não deve ter colchetes de Markdown dentro do código. O carregador baixa o menu, a configuração e as categorias automaticamente.
+O link precisa apontar para o conteúdo **raw** e não deve ter colchetes de Markdown dentro do código. O parâmetro `v` evita que o executor reutilize uma versão antiga. O carregador baixa o menu, a configuração e as categorias automaticamente, também ignorando cache.
 
 ## Controles
 
