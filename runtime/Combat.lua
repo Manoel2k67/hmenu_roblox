@@ -302,13 +302,19 @@ function Combat:Create(options)
     local function gunRemote(gun)
         if not gun then return nil end
         local knifeLocal = gun:FindFirstChild("KnifeLocal")
-        local createBeam = knifeLocal and knifeLocal:FindFirstChild("CreateBeam")
-        local direct = createBeam and createBeam:FindFirstChild("RemoteFunction")
-        if direct and direct:IsA("RemoteFunction") then return direct end
+        local createBeam = knifeLocal and knifeLocal:FindFirstChild("CreateBeam", true)
+        local direct = createBeam and createBeam:FindFirstChild("RemoteFunction", true)
+        if direct and direct:IsA("RemoteFunction") then
+            return direct
+        end
         for _, descendant in ipairs(gun:GetDescendants()) do
             if descendant:IsA("RemoteFunction") and descendant.Name == "RemoteFunction" then
-                local parentName = descendant.Parent and descendant.Parent.Name or ""
-                if parentName == "CreateBeam" then return descendant end
+                local node = descendant.Parent
+                for _ = 1, 8 do
+                    if not node then break end
+                    if node.Name == "CreateBeam" then return descendant end
+                    node = node.Parent
+                end
             end
         end
         return nil
@@ -351,13 +357,16 @@ function Combat:Create(options)
 
     local function remoteLooksLikeGunShot(remote)
         if typeof(remote) ~= "Instance" or remote.Name ~= "RemoteFunction" then return false end
-        local parentNode = remote.Parent
-        if not parentNode or parentNode.Name ~= "CreateBeam" then return false end
-        local node = parentNode
-        for _ = 1, 6 do
-            node = node and node.Parent
+        local node = remote.Parent
+        local hasCreateBeam = false
+        for _ = 1, 10 do
             if not node then break end
-            if node.Name == "Gun" then return true end
+            if node.Name == "CreateBeam" then
+                hasCreateBeam = true
+            elseif hasCreateBeam and node.Name == "Gun" then
+                return true
+            end
+            node = node.Parent
         end
         return false
     end
@@ -407,14 +416,17 @@ function Combat:Create(options)
         local position = murderer and predictedPosition(murderer)
         if not position then return false end
         local args = table.pack(...)
-        if typeof(args[2]) == "Vector3" then
-            args[2] = position
-        elseif typeof(args[1]) == "Vector3" then
-            args[1] = position
-        else
-            return false
+        for index = 1, args.n do
+            local argumentType = typeof(args[index])
+            if argumentType == "Vector3" then
+                args[index] = position
+                return true, args
+            elseif argumentType == "CFrame" then
+                args[index] = CFrame.new(position)
+                return true, args
+            end
         end
-        return true, args
+        return false
     end
 
     local function enablePerfectShotHook()
