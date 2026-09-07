@@ -2,7 +2,7 @@ return {
     Id = "Visuals",
     Label = "Visuals",
     Icon = "eye",
-    Bookmarked = true,
+    Bookmarked = false,
     RuntimeModule = "runtime/Visuals.lua",
     Sections = {
         {
@@ -10,11 +10,11 @@ return {
             Icon = "eye",
             Controls = {
                 { Kind = "Toggle", Setting = "EspEnabled", Id = "esp_enabled", Label = "Enable ESP", Description = "Innocent: green | Murderer: red | Sheriff: blue", Default = false },
-                { Kind = "Toggle", Setting = "PlayerNames", Id = "player_names", Label = "Player Names", Default = true },
-                { Kind = "Toggle", Setting = "ShowRoles", Id = "show_roles", Label = "Show Roles", Default = true },
+                { Kind = "Toggle", Setting = "PlayerNames", Id = "player_names", Label = "Player Names", Default = false },
+                { Kind = "Toggle", Setting = "ShowRoles", Id = "show_roles", Label = "Show Roles", Default = false },
                 { Kind = "Toggle", Setting = "ShowDistance", Id = "show_distance", Label = "Show Distance", Default = false },
                 { Kind = "Toggle", Setting = "ShowHealth", Id = "show_health", Label = "Show Health", Default = false },
-                { Kind = "Toggle", Setting = "XRay", Id = "xray", Label = "X-Ray ESP", Description = "Keep role highlights visible through walls.", Default = true },
+                { Kind = "Toggle", Setting = "XRay", Id = "xray", Label = "X-Ray ESP", Description = "Keep role highlights visible through walls.", Default = false },
                 { Kind = "Slider", Setting = "FillTransparency", Id = "esp_fill", Label = "Fill Transparency", Min = 0, Max = 100, Default = 68, Step = 1 },
             },
         },

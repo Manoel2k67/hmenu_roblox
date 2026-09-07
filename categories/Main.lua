@@ -7,8 +7,8 @@ return {
             { Kind = "Button", Id = "save_profile", Label = "Salvar preferências", ButtonText = "Salvar" },
         }},
         { Title = "Quick settings", Icon = "settings", Controls = {
-            { Kind = "Toggle", Id = "notifications", Label = "Notificações", Default = true },
-            { Kind = "Toggle", Id = "auto_save", Label = "Salvar automaticamente", Default = true },
+            { Kind = "Toggle", Id = "notifications", Label = "Notificações", Default = false },
+            { Kind = "Toggle", Id = "auto_save", Label = "Salvar automaticamente", Default = false },
         }},
     },
 }

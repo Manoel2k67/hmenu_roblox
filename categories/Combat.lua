@@ -1,5 +1,5 @@
 return {
-    Id = "Combat", Label = "Combat", Icon = "target", Bookmarked = true,
+    Id = "Combat", Label = "Combat", Icon = "target", Bookmarked = false,
     Sections = {
         { Title = "Combat settings", Icon = "target", Controls = {
             { Kind = "Toggle", Id = "combat_assist", Label = "Combat Assist", Description = "Demonstração; nenhuma lógica conectada.", Default = false },

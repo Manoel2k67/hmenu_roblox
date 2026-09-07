@@ -253,7 +253,7 @@ function HMenu:Create(options)
 
     local function createToggle(parent, control, row)
         local saved = state[control.Id or control.Label]
-        local enabled = saved == nil and control.Default == true or saved == true
+        local enabled = saved == true
         local track = make("Frame", {
             Size = UDim2.fromOffset(36, 19), Position = UDim2.new(1, -50, 0.5, -10),
             BackgroundColor3 = enabled and Theme.Accent or Theme.Control, BorderSizePixel = 0,
@@ -268,7 +268,7 @@ function HMenu:Create(options)
         local hit = make("TextButton", {
             Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "", AutoButtonColor = false,
         }, row)
-        fire(control, enabled)
+        state[control.Id or control.Label] = enabled
         connect(hit.MouseButton1Click, function()
             enabled = not enabled
             TweenService:Create(track, TweenInfo.new(0.14), { BackgroundColor3 = enabled and Theme.Accent or Theme.Control }):Play()
@@ -328,7 +328,7 @@ function HMenu:Create(options)
         connect(UserInputService.InputEnded, function(inputObject)
             if inputObject.UserInputType == Enum.UserInputType.MouseButton1 or inputObject.UserInputType == Enum.UserInputType.Touch then dragging = false end
         end)
-        fire(control, value)
+        state[control.Id or control.Label] = value
     end
 
     local function createChoice(control, row)
@@ -342,7 +342,7 @@ function HMenu:Create(options)
         }, row)
         round(button, 5)
         stroke(button, Theme.Border, 0.55)
-        fire(control, choices[index])
+        state[control.Id or control.Label] = choices[index]
         connect(button.MouseButton1Click, function()
             index = index % #choices + 1
             button.Text = tostring(choices[index]) .. "  v"
@@ -465,6 +465,7 @@ function HMenu:Create(options)
     end
 
     for index, category in ipairs(categories) do
+        category.Bookmarked = false
         local button = make("TextButton", {
             Name = category.Id, Size = UDim2.new(1, 0, 0, 35), BackgroundColor3 = Theme.Surface,
             BackgroundTransparency = 1, BorderSizePixel = 0,
@@ -491,12 +492,12 @@ function HMenu:Create(options)
             Name = "Favorite", AnchorPoint = Vector2.new(0.5, 0.5),
             Size = UDim2.fromOffset(16, 16), Position = UDim2.new(1, -17, 0.5, 0),
             BackgroundTransparency = 1, BorderSizePixel = 0, Image = Config.Icons.bookmark,
-            ImageColor3 = category.Bookmarked and Theme.Bookmark or Theme.Dim,
+            ImageColor3 = Theme.Dim,
             AutoButtonColor = false, ZIndex = 5,
         }, button)
         navButtons[category.Id] = {
             Button = button, Category = category, FavoriteButton = favorite,
-            Favorite = category.Bookmarked == true, OriginalIndex = index,
+            Favorite = false, OriginalIndex = index,
         }
         connect(button.MouseButton1Click, function() selectCategory(category, button) end)
         connect(button.MouseEnter, function()

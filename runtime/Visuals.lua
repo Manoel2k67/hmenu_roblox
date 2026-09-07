@@ -43,11 +43,11 @@ function Visuals:Create(options)
 
     local settings = {
         EspEnabled = false,
-        PlayerNames = true,
-        ShowRoles = true,
+        PlayerNames = false,
+        ShowRoles = false,
         ShowDistance = false,
         ShowHealth = false,
-        XRay = true,
+        XRay = false,
         FillTransparency = 68,
         DroppedGun = false,
         Fov = 70,
