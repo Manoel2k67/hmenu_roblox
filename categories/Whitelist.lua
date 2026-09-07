@@ -1,0 +1,10 @@
+return {
+    Id = "Whitelist", Label = "Whitelist", Icon = "♢", Bookmarked = false,
+    Sections = {
+        { Title = "Access list", Icon = "♢", Controls = {
+            { Kind = "Toggle", Id = "friends_allowed", Label = "Allow Friends", Default = true },
+            { Kind = "Dropdown", Id = "list_policy", Label = "Default Policy", Options = { "Ignore", "Allow", "Block" }, Default = "Ignore" },
+            { Kind = "Button", Id = "refresh_list", Label = "Refresh List", ButtonText = "Atualizar" },
+        }},
+    },
+}
