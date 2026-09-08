@@ -43,7 +43,8 @@ end
 function HMenu:Create(options)
     assert(options and type(options.Import) == "function", "HMenu requires an Import function")
     local Config = options.Import("HMenuConfig.lua")
-    local Theme = Config.Theme
+    local Theme = {}
+    for key, value in pairs(Config.Theme) do Theme[key] = value end
     local Parent = options.Parent or Players.LocalPlayer:WaitForChild("PlayerGui")
     local function icon(parent, iconName, properties)
         properties = properties or {}
@@ -128,11 +129,30 @@ function HMenu:Create(options)
     }, gui)
     round(root, 12)
     stroke(root, Theme.Border, 0.3)
-    make("UIGradient", {
+    local rootGradient = make("UIGradient", {
         Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(38, 58, 96)),
+            ColorSequenceKeypoint.new(0, Theme.WindowHighlight),
             ColorSequenceKeypoint.new(1, Theme.WindowDark),
         }), Rotation = 135,
+    }, root)
+    local wallpaper = make("ImageLabel", {
+        Name = "ThemeWallpaper",
+        Size = UDim2.fromScale(1, 1),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        Image = "",
+        ImageColor3 = Color3.fromRGB(225, 225, 235),
+        ImageTransparency = 1,
+        ScaleType = Enum.ScaleType.Crop,
+        Visible = false,
+    }, root)
+    local wallpaperShade = make("Frame", {
+        Name = "ThemeWallpaperShade",
+        Size = UDim2.fromScale(1, 1),
+        BackgroundColor3 = Theme.WindowDark,
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        Visible = false,
     }, root)
     local scale = make("UIScale", { Scale = 1 }, root)
     local accentLine = make("Frame", {
@@ -148,7 +168,7 @@ function HMenu:Create(options)
 
     local header = make("Frame", {
         Name = "Header", Size = UDim2.new(1, 0, 0, 54), BackgroundColor3 = Theme.Header,
-        BackgroundTransparency = 0.22, BorderSizePixel = 0, Active = true,
+        BackgroundTransparency = 0.22, BorderSizePixel = 0, Active = true, ZIndex = 2,
     }, root)
     text(header, "HMenu " .. Config.Version, {
         Size = UDim2.fromOffset(230, 54), Position = UDim2.fromOffset(20, 0),
@@ -182,7 +202,7 @@ function HMenu:Create(options)
 
     local sidebar = make("Frame", {
         Name = "Sidebar", Size = UDim2.new(0, 178, 1, -54), Position = UDim2.fromOffset(0, 54),
-        BackgroundColor3 = Theme.Sidebar, BackgroundTransparency = 0.24, BorderSizePixel = 0,
+        BackgroundColor3 = Theme.Sidebar, BackgroundTransparency = 0.24, BorderSizePixel = 0, ZIndex = 2,
     }, root)
     make("Frame", {
         Size = UDim2.new(0, 1, 1, 0), Position = UDim2.new(1, -1, 0, 0),
@@ -219,7 +239,7 @@ function HMenu:Create(options)
 
     local content = make("Frame", {
         Name = "Content", Size = UDim2.new(1, -178, 1, -54), Position = UDim2.fromOffset(178, 54),
-        BackgroundTransparency = 1, BorderSizePixel = 0,
+        BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 2,
     }, root)
     local titleIcon = icon(content, "home", {
         Size = UDim2.fromOffset(21, 21), Position = UDim2.fromOffset(25, 26),
@@ -658,7 +678,137 @@ function HMenu:Create(options)
     if Workspace.CurrentCamera then cameraConnection = connect(Workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"), updateScale) end
     updateScale()
 
+    local currentThemeName = "Default"
+    local wallpaperRequest = 0
+    local wallpaperAssets = {}
+    local themeKeys = {
+        "Window", "WindowHighlight", "WindowDark", "Sidebar", "Header",
+        "Surface", "SurfaceHover", "Control", "Accent", "Bookmark",
+        "Text", "Muted", "Dim", "Border", "Success", "Danger",
+    }
+    local colorProperties = {
+        "BackgroundColor3", "TextColor3", "PlaceholderColor3",
+        "ImageColor3", "ScrollBarImageColor3", "Color",
+    }
+
+    local function copyColors(source)
+        local result = {}
+        for _, key in ipairs(themeKeys) do result[key] = source[key] end
+        return result
+    end
+
+    local function colorThemeKey(color, palette)
+        if typeof(color) ~= "Color3" then return nil end
+        for _, key in ipairs(themeKeys) do
+            if palette[key] == color then return key end
+        end
+        return nil
+    end
+
+    local function recolorMenu(oldColors, newColors)
+        local objects = { root }
+        for _, object in ipairs(root:GetDescendants()) do table.insert(objects, object) end
+        for _, object in ipairs(objects) do
+            for _, property in ipairs(colorProperties) do
+                local ok, current = pcall(function() return object[property] end)
+                if ok then
+                    local key = colorThemeKey(current, oldColors)
+                    if key and newColors[key] then
+                        pcall(function() object[property] = newColors[key] end)
+                    end
+                end
+            end
+        end
+    end
+
+    local function wallpaperAsset(themeName, definition)
+        if wallpaperAssets[themeName] then return wallpaperAssets[themeName] end
+        local assetLoader = type(getcustomasset) == "function" and getcustomasset
+            or (type(getsynasset) == "function" and getsynasset or nil)
+        if not assetLoader or type(writefile) ~= "function" then return nil end
+
+        local baseUrl = options.BaseUrl
+        if type(baseUrl) ~= "string" or baseUrl == "" then return nil end
+        if string.sub(baseUrl, -1) ~= "/" then baseUrl = baseUrl .. "/" end
+
+        local ok, asset = pcall(function()
+            local directory = "HMenuThemes"
+            local localPath = "HMenuTheme-" .. themeName .. ".png"
+            if type(makefolder) == "function" then
+                pcall(function() makefolder(directory) end)
+                localPath = directory .. "/" .. themeName .. ".png"
+            end
+            local data = game:HttpGet(baseUrl .. definition.Wallpaper .. "?v=" .. tostring(os.time()), true)
+            writefile(localPath, data)
+            return assetLoader(localPath)
+        end)
+        if not ok or not asset then
+            warn("[HMenu] Wallpaper could not be loaded:", themeName, asset)
+            return nil
+        end
+        wallpaperAssets[themeName] = asset
+        return asset
+    end
+
+    local function updateWallpaper(themeName, definition)
+        wallpaperRequest = wallpaperRequest + 1
+        local request = wallpaperRequest
+        wallpaper.Visible = false
+        wallpaperShade.Visible = false
+        if not definition.Wallpaper then
+            wallpaper.Image = ""
+            wallpaper.ImageTransparency = 1
+            wallpaperShade.BackgroundTransparency = 1
+            return
+        end
+
+        task.spawn(function()
+            local asset = wallpaperAsset(themeName, definition)
+            if request ~= wallpaperRequest or currentThemeName ~= themeName or not asset then return end
+            wallpaper.Image = asset
+            wallpaper.ImageTransparency = 1
+            wallpaperShade.BackgroundTransparency = 1
+            wallpaper.Visible = true
+            wallpaperShade.Visible = true
+            TweenService:Create(wallpaper, TweenInfo.new(0.28, Enum.EasingStyle.Quad), {
+                ImageTransparency = definition.WallpaperTransparency or 0.42,
+            }):Play()
+            TweenService:Create(wallpaperShade, TweenInfo.new(0.28, Enum.EasingStyle.Quad), {
+                BackgroundTransparency = definition.ShadeTransparency or 0.5,
+            }):Play()
+        end)
+    end
+
+    local function applyTheme(themeName)
+        local definition = Config.Themes and Config.Themes[themeName]
+        if not definition or not definition.Colors or themeName == currentThemeName then return end
+        closeDropdown()
+
+        local oldColors = copyColors(Theme)
+        local newColors = definition.Colors
+        recolorMenu(oldColors, newColors)
+        for _, key in ipairs(themeKeys) do
+            if newColors[key] then Theme[key] = newColors[key] end
+        end
+        currentThemeName = themeName
+        rootGradient.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Theme.WindowHighlight),
+            ColorSequenceKeypoint.new(1, Theme.WindowDark),
+        })
+        wallpaperShade.BackgroundColor3 = Theme.WindowDark
+        updateWallpaper(themeName, definition)
+
+        if activeCategory then render(activeCategory) end
+        refreshFavoriteOrder()
+    end
+
+    local themeSetter = function(themeName)
+        applyTheme(tostring(themeName or "Default"))
+    end
+    _G.__HMENU_SET_THEME = themeSetter
+
     local function cleanup()
+        wallpaperRequest = wallpaperRequest + 1
         for _, runtime in ipairs(runtimes) do
             if type(runtime.Destroy) == "function" then pcall(function() runtime:Destroy() end) end
         end
@@ -666,6 +816,7 @@ function HMenu:Create(options)
         for _, connection in ipairs(connections) do pcall(function() connection:Disconnect() end) end
         connections = {}
         if gui and gui.Parent then gui:Destroy() end
+        if _G.__HMENU_SET_THEME == themeSetter then _G.__HMENU_SET_THEME = nil end
         if _G.__HMENU_CLEANUP == cleanup then _G.__HMENU_CLEANUP = nil end
     end
     _G.__HMENU_CLEANUP = cleanup

@@ -8,6 +8,7 @@ Config.Window = { Width = 720, Height = 520, MinScale = 0.68, Margin = 24 }
 
 Config.Theme = {
     Window = Color3.fromRGB(31, 48, 80),
+    WindowHighlight = Color3.fromRGB(38, 58, 96),
     WindowDark = Color3.fromRGB(18, 29, 51),
     Sidebar = Color3.fromRGB(27, 42, 70),
     Header = Color3.fromRGB(29, 45, 76),
@@ -22,6 +23,58 @@ Config.Theme = {
     Border = Color3.fromRGB(83, 112, 169),
     Success = Color3.fromRGB(96, 218, 151),
     Danger = Color3.fromRGB(255, 112, 124),
+}
+
+Config.Themes = {
+    Default = {
+        Colors = Config.Theme,
+    },
+    Purple = {
+        Wallpaper = "theme/wallpapers/Purple.png",
+        WallpaperTransparency = 0.42,
+        ShadeTransparency = 0.5,
+        Colors = {
+            Window = Color3.fromRGB(37, 24, 61),
+            WindowHighlight = Color3.fromRGB(69, 43, 108),
+            WindowDark = Color3.fromRGB(18, 11, 33),
+            Sidebar = Color3.fromRGB(29, 19, 49),
+            Header = Color3.fromRGB(34, 21, 56),
+            Surface = Color3.fromRGB(45, 29, 73),
+            SurfaceHover = Color3.fromRGB(61, 40, 96),
+            Control = Color3.fromRGB(32, 21, 54),
+            Accent = Color3.fromRGB(177, 105, 255),
+            Bookmark = Color3.fromRGB(255, 220, 78),
+            Text = Color3.fromRGB(247, 242, 255),
+            Muted = Color3.fromRGB(198, 181, 224),
+            Dim = Color3.fromRGB(143, 120, 176),
+            Border = Color3.fromRGB(111, 77, 151),
+            Success = Color3.fromRGB(105, 224, 158),
+            Danger = Color3.fromRGB(255, 119, 144),
+        },
+    },
+    Orange = {
+        Wallpaper = "theme/wallpapers/Orange.png",
+        WallpaperTransparency = 0.42,
+        ShadeTransparency = 0.5,
+        Colors = {
+            Window = Color3.fromRGB(58, 31, 18),
+            WindowHighlight = Color3.fromRGB(108, 55, 24),
+            WindowDark = Color3.fromRGB(31, 15, 8),
+            Sidebar = Color3.fromRGB(48, 25, 14),
+            Header = Color3.fromRGB(55, 28, 16),
+            Surface = Color3.fromRGB(68, 35, 20),
+            SurfaceHover = Color3.fromRGB(91, 48, 26),
+            Control = Color3.fromRGB(49, 25, 14),
+            Accent = Color3.fromRGB(255, 145, 58),
+            Bookmark = Color3.fromRGB(255, 220, 78),
+            Text = Color3.fromRGB(255, 246, 237),
+            Muted = Color3.fromRGB(222, 190, 163),
+            Dim = Color3.fromRGB(171, 128, 94),
+            Border = Color3.fromRGB(158, 88, 44),
+            Success = Color3.fromRGB(112, 222, 151),
+            Danger = Color3.fromRGB(255, 116, 104),
+        },
+    },
 }
 
 -- Lucide line icons published as Roblox image assets.

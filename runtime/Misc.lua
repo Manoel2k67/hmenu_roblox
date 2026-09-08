@@ -20,6 +20,7 @@ function Misc:Create(options)
     local cleanupFunction
 
     local settings = {
+        MenuTheme = "Default",
         ShowFPS = false,
         PerformanceMode = false,
     }
@@ -118,7 +119,10 @@ function Misc:Create(options)
     function runtime:Set(name, value)
         if destroyed or settings[name] == nil then return end
         settings[name] = value
-        if name == "ShowFPS" then
+        if name == "MenuTheme" then
+            local setTheme = rawget(_G, "__HMENU_SET_THEME")
+            if type(setTheme) == "function" then setTheme(value) end
+        elseif name == "ShowFPS" then
             statsLabel.Visible = value
         elseif name == "PerformanceMode" then
             applyPerformanceMode()
