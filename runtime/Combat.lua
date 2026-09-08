@@ -60,6 +60,7 @@ function Combat:Create(options)
     local grabBusy = false
     local lastAutoShot = 0
     local lastPerfectShot = 0
+    local lastPerfectRedirect = 0
     local lastGrabAttempt = 0
     local lastEvade = 0
     local lastAuraAttack = 0
@@ -356,14 +357,21 @@ function Combat:Create(options)
     end
 
     local function remoteLooksLikeGunShot(remote)
-        if typeof(remote) ~= "Instance" or remote.Name ~= "RemoteFunction" then return false end
+        if typeof(remote) ~= "Instance" or not remote:IsA("RemoteFunction") then return false end
+
+        -- Prefer comparing against the remote discovered from the Gun the player
+        -- actually owns. Some MM2 versions add wrappers between CreateBeam and the
+        -- RemoteFunction, which made the old ancestry-only check miss the shot.
+        local currentGun = toolIn(localPlayer, "Gun")
+        if currentGun and gunRemote(currentGun) == remote then return true end
+
         local node = remote.Parent
         local hasCreateBeam = false
-        for _ = 1, 10 do
+        for _ = 1, 12 do
             if not node then break end
             if node.Name == "CreateBeam" then
                 hasCreateBeam = true
-            elseif hasCreateBeam and node.Name == "Gun" then
+            elseif hasCreateBeam and node:IsA("Tool") and node.Name == "Gun" then
                 return true
             end
             node = node.Parent
@@ -416,13 +424,23 @@ function Combat:Create(options)
         local position = murderer and predictedPosition(murderer)
         if not position then return false end
         local args = table.pack(...)
+
+        -- MM2's normal signature stores the hit position in argument 2. Prefer it
+        -- when several spatial arguments exist so an origin CFrame is not changed.
+        local order = {}
+        if args.n >= 2 then table.insert(order, 2) end
         for index = 1, args.n do
+            if index ~= 2 then table.insert(order, index) end
+        end
+        for _, index in ipairs(order) do
             local argumentType = typeof(args[index])
             if argumentType == "Vector3" then
                 args[index] = position
+                lastPerfectRedirect = tick()
                 return true, args
             elseif argumentType == "CFrame" then
                 args[index] = CFrame.new(position)
+                lastPerfectRedirect = tick()
                 return true, args
             end
         end
@@ -460,15 +478,17 @@ function Combat:Create(options)
         boundGun = gun
         gunActivationConnection = gun.Activated:Connect(function()
             if destroyed or not settings.SheriffPerfectShots then return end
-            local hookActive = perfectHookState and perfectHookState.Handler == perfectHookHandler
-            if hookActive then return end
             local now = tick()
             if now - lastPerfectShot < 0.15 then return end
             lastPerfectShot = now
-            -- Fallback for executors without hookmetamethod: send a direct target shot
-            -- when the equipped Gun is manually activated.
+
+            -- Tool.Activated is also a per-shot safety net. A hook being installed
+            -- does not guarantee that a particular game remote was recognized.
+            -- Defer until the Gun's own Activated callbacks have had the chance to
+            -- invoke the remote, then only send a direct shot if no redirect occurred.
             task.defer(function()
                 if destroyed or not settings.SheriffPerfectShots then return end
+                if tick() - lastPerfectRedirect < 0.12 then return end
                 refreshRoles()
                 local murderer = findMurderer()
                 if murderer then fireGunAt(murderer, false) end
