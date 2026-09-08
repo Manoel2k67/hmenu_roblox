@@ -46,6 +46,7 @@ function Combat:Create(options)
 
     local runtime = {}
     local localPlayer = Players.LocalPlayer
+    local localMouse = localPlayer:GetMouse()
     local parent = options and options.Parent or localPlayer:WaitForChild("PlayerGui")
     local destroyed = false
     local cleanupFunction
@@ -68,6 +69,10 @@ function Combat:Create(options)
     local hitboxOriginals = {}
     local perfectHookState = nil
     local perfectHookHandler = nil
+    local perfectMouseHookState = nil
+    local perfectMouseHookHandler = nil
+    local suppressedGunConnections = {}
+    local nativeGunSuppressed = false
 
     local settings = {
         MurderKillAura = false,
@@ -206,13 +211,23 @@ function Combat:Create(options)
 
     local function isAlive(player)
         if not player or not player.Parent or not player.Character then return false end
-        local data = roles[player.Name]
-        if data and (data.Dead or data.Killed) then return false end
+        local root = rootPart(player)
+        if not root then return false end
         local humanoid = humanoidOf(player)
-        return rootPart(player) ~= nil and (not humanoid or humanoid.Health > 0)
+        if humanoid then return humanoid.Health > 0 end
+        local data = roles[player.Name]
+        return not (data and (data.Dead or data.Killed))
     end
 
     local function findMurderer()
+        -- Tool ownership is the freshest role signal during round transitions.
+        -- Prefer it over cached GetPlayerData so a stale Innocent role cannot make
+        -- Perfect Shots silently keep the original mouse target.
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= localPlayer and isAlive(player) and toolIn(player, "Knife") then
+                return player
+            end
+        end
         for _, player in ipairs(Players:GetPlayers()) do
             if player ~= localPlayer and isAlive(player) and roleOf(player) == "Murderer" then
                 return player
@@ -461,21 +476,123 @@ function Combat:Create(options)
         end
     end
 
+    local function ensurePerfectMouseHook()
+        local existing = rawget(_G, "__HMENU_COMBAT_MOUSE_HOOK")
+        if type(existing) == "table" and existing.Installed then
+            perfectMouseHookState = existing
+            return existing
+        end
+        if type(hookmetamethod) ~= "function" or type(newcclosure) ~= "function" then
+            return nil
+        end
+
+        local state = { Installed = false, Handler = nil, Busy = false }
+        local oldIndex
+        local ok, result = pcall(function()
+            oldIndex = hookmetamethod(game, "__index", newcclosure(function(self, key)
+                local handler = state.Handler
+                if handler and not state.Busy then
+                    state.Busy = true
+                    local handledOk, handled, value = pcall(handler, self, key)
+                    state.Busy = false
+                    if handledOk and handled then return value end
+                end
+                return oldIndex(self, key)
+            end))
+            return oldIndex
+        end)
+        if not ok or not result then return nil end
+
+        state.Old = oldIndex
+        state.Installed = true
+        _G.__HMENU_COMBAT_MOUSE_HOOK = state
+        perfectMouseHookState = state
+        return state
+    end
+
+    perfectMouseHookHandler = function(object, key)
+        if destroyed or not settings.SheriffPerfectShots or object ~= localMouse then
+            return false
+        end
+        if key ~= "Hit" and key ~= "Target" and key ~= "UnitRay" then
+            return false
+        end
+
+        local murderer = findMurderer()
+        local part = murderer and targetPartFor(murderer)
+        local position = murderer and predictedPosition(murderer)
+        if not part or not position then return false end
+        lastPerfectRedirect = tick()
+
+        if key == "Target" then return true, part end
+        if key == "Hit" then return true, CFrame.new(position) end
+
+        local camera = Workspace.CurrentCamera
+        local origin = camera and camera.CFrame.Position or (localRoot() and localRoot().Position)
+        if not origin or (position - origin).Magnitude < 0.01 then return false end
+        return true, Ray.new(origin, (position - origin).Unit * 1000)
+    end
+
+    local function enablePerfectMouseHook()
+        local state = ensurePerfectMouseHook()
+        if not state then return false end
+        state.Handler = perfectMouseHookHandler
+        return true
+    end
+
+    local function disablePerfectMouseHook()
+        local state = perfectMouseHookState or rawget(_G, "__HMENU_COMBAT_MOUSE_HOOK")
+        if type(state) == "table" and state.Handler == perfectMouseHookHandler then
+            state.Handler = nil
+        end
+    end
+
+    local function restoreGunConnections()
+        for _, connection in ipairs(suppressedGunConnections) do
+            pcall(function()
+                if type(connection.Enable) == "function" then connection:Enable() end
+            end)
+        end
+        suppressedGunConnections = {}
+        nativeGunSuppressed = false
+    end
+
+    local function suppressGunConnections(gun)
+        if type(getconnections) ~= "function" or not gun then return false end
+        local ok, found = pcall(function() return getconnections(gun.Activated) end)
+        if not ok or type(found) ~= "table" then return false end
+
+        for _, connection in ipairs(found) do
+            local disabled = pcall(function()
+                if type(connection.Disable) ~= "function" then error("unsupported connection") end
+                connection:Disable()
+            end)
+            if disabled then table.insert(suppressedGunConnections, connection) end
+        end
+        return #suppressedGunConnections > 0
+    end
+
     local function disconnectGunActivation()
         if gunActivationConnection then
             gunActivationConnection:Disconnect()
             gunActivationConnection = nil
         end
+        restoreGunConnections()
         boundGun = nil
     end
 
     local function bindGunActivation()
+        if not settings.SheriffPerfectShots then
+            if gunActivationConnection or #suppressedGunConnections > 0 then disconnectGunActivation() end
+            return
+        end
         local currentCharacter = character()
         local gun = currentCharacter and currentCharacter:FindFirstChild("Gun")
         if gun == boundGun and gunActivationConnection then return end
         disconnectGunActivation()
         if not gun then return end
         boundGun = gun
+        nativeGunSuppressed = suppressGunConnections(gun)
         gunActivationConnection = gun.Activated:Connect(function()
             if destroyed or not settings.SheriffPerfectShots then return end
             local now = tick()
@@ -488,7 +605,7 @@ function Combat:Create(options)
             -- invoke the remote, then only send a direct shot if no redirect occurred.
             task.defer(function()
                 if destroyed or not settings.SheriffPerfectShots then return end
-                if tick() - lastPerfectRedirect < 0.12 then return end
+                if not nativeGunSuppressed and tick() - lastPerfectRedirect < 0.12 then return end
                 refreshRoles()
                 local murderer = findMurderer()
                 if murderer then fireGunAt(murderer, false) end
@@ -889,12 +1006,16 @@ function Combat:Create(options)
             if value then
                 refreshRoles()
                 local hooked = enablePerfectShotHook()
+                local mouseHooked = enablePerfectMouseHook()
+                disconnectGunActivation()
                 bindGunActivation()
-                if not hooked then
-                    notify("Perfect Shots using Tool.Activated fallback; this executor has no namecall hook.", false)
+                if not hooked and not mouseHooked and type(getconnections) ~= "function" then
+                    notify("Perfect Shots has limited support in this executor.", false)
                 end
             else
                 disablePerfectShotHook()
+                disablePerfectMouseHook()
+                disconnectGunActivation()
             end
         elseif name == "UtilsHitboxExpander" then
             if value then
@@ -923,6 +1044,7 @@ function Combat:Create(options)
         settings.UtilsAutoEvadeMurderer = false
         settings.UtilsHitboxExpander = false
         disablePerfectShotHook()
+        disablePerfectMouseHook()
         disconnectGunActivation()
         restoreAllHitboxes()
         for _, connection in ipairs(connections) do
