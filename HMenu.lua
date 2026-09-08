@@ -99,9 +99,11 @@ function HMenu:Create(options)
                                 end
                             end
                             if control.Setting then
+                                local settingName = control.Setting
+                                local settingRuntime = runtime
                                 local previousCallback = control.Callback
                                 control.Callback = function(value, state)
-                                    runtime:Set(control.Setting, value)
+                                    settingRuntime:Set(settingName, value)
                                     if type(previousCallback) == "function" then
                                         previousCallback(value, state)
                                     end

@@ -69,6 +69,7 @@ function Combat:Create(options)
     local hitboxOriginals = {}
     local perfectHookState = nil
     local perfectHookHandler = nil
+    local perfectInvokeHookState = nil
     local perfectMouseHookState = nil
     local perfectMouseHookHandler = nil
     local suppressedGunConnections = {}
@@ -432,13 +433,20 @@ function Combat:Create(options)
     end
 
     perfectHookHandler = function(remote, ...)
-        if destroyed or not settings.SheriffPerfectShots or not remoteLooksLikeGunShot(remote) then
+        if destroyed or not settings.SheriffPerfectShots then
             return false
         end
+        local args = table.pack(...)
+        local hasMM2Signature = typeof(remote) == "Instance"
+            and remote:IsA("RemoteFunction")
+            and args[1] == 1
+            and args[3] == "AH2"
+            and toolIn(localPlayer, "Gun") ~= nil
+        if not hasMM2Signature and not remoteLooksLikeGunShot(remote) then return false end
+
         local murderer = findMurderer()
         local position = murderer and predictedPosition(murderer)
         if not position then return false end
-        local args = table.pack(...)
 
         -- MM2's normal signature stores the hit position in argument 2. Prefer it
         -- when several spatial arguments exist so an origin CFrame is not changed.
@@ -471,6 +479,61 @@ function Combat:Create(options)
 
     local function disablePerfectShotHook()
         local state = perfectHookState or rawget(_G, "__HMENU_COMBAT_NAMECALL_HOOK")
+        if type(state) == "table" and state.Handler == perfectHookHandler then
+            state.Handler = nil
+        end
+    end
+
+    local function ensurePerfectInvokeHook(remote)
+        local existing = rawget(_G, "__HMENU_COMBAT_INVOKE_HOOK")
+        if type(existing) == "table" and existing.Installed then
+            perfectInvokeHookState = existing
+            return existing
+        end
+        if not remote or not remote:IsA("RemoteFunction") then return nil end
+
+        local hook = type(hookfunction) == "function" and hookfunction
+            or (type(hookfunc) == "function" and hookfunc or nil)
+        if not hook then return nil end
+
+        local state = { Installed = false, Handler = nil, Busy = false }
+        local oldInvoke
+        local callback = function(self, ...)
+            local handler = state.Handler
+            if handler and not state.Busy then
+                state.Busy = true
+                local handledOk, handled, packed = pcall(handler, self, ...)
+                state.Busy = false
+                if handledOk and handled and packed then
+                    return oldInvoke(self, table.unpack(packed, 1, packed.n))
+                end
+            end
+            return oldInvoke(self, ...)
+        end
+        if type(newcclosure) == "function" then callback = newcclosure(callback) end
+
+        local ok, result = pcall(function()
+            oldInvoke = hook(remote.InvokeServer, callback)
+            return oldInvoke
+        end)
+        if not ok or not result then return nil end
+
+        state.Old = oldInvoke
+        state.Installed = true
+        _G.__HMENU_COMBAT_INVOKE_HOOK = state
+        perfectInvokeHookState = state
+        return state
+    end
+
+    local function enablePerfectInvokeHook(remote)
+        local state = ensurePerfectInvokeHook(remote)
+        if not state then return false end
+        state.Handler = perfectHookHandler
+        return true
+    end
+
+    local function disablePerfectInvokeHook()
+        local state = perfectInvokeHookState or rawget(_G, "__HMENU_COMBAT_INVOKE_HOOK")
         if type(state) == "table" and state.Handler == perfectHookHandler then
             state.Handler = nil
         end
@@ -592,7 +655,12 @@ function Combat:Create(options)
         disconnectGunActivation()
         if not gun then return end
         boundGun = gun
-        nativeGunSuppressed = suppressGunConnections(gun)
+        local invokeHooked = enablePerfectInvokeHook(gunRemote(gun))
+        local namecallHooked = perfectHookState and perfectHookState.Handler == perfectHookHandler
+        local mouseHooked = perfectMouseHookState and perfectMouseHookState.Handler == perfectMouseHookHandler
+        if not invokeHooked and not namecallHooked and not mouseHooked then
+            nativeGunSuppressed = suppressGunConnections(gun)
+        end
         gunActivationConnection = gun.Activated:Connect(function()
             if destroyed or not settings.SheriffPerfectShots then return end
             local now = tick()
@@ -1007,13 +1075,19 @@ function Combat:Create(options)
                 refreshRoles()
                 local hooked = enablePerfectShotHook()
                 local mouseHooked = enablePerfectMouseHook()
+                local gun = toolIn(localPlayer, "Gun")
+                local invokeHooked = enablePerfectInvokeHook(gunRemote(gun))
                 disconnectGunActivation()
                 bindGunActivation()
-                if not hooked and not mouseHooked and type(getconnections) ~= "function" then
+                if not hooked and not mouseHooked and not invokeHooked and type(getconnections) ~= "function" then
                     notify("Perfect Shots has limited support in this executor.", false)
+                else
+                    local murderer = findMurderer()
+                    notify(murderer and ("Perfect Shots ready: " .. murderer.Name) or "Perfect Shots ready; waiting for Murderer.", murderer ~= nil)
                 end
             else
                 disablePerfectShotHook()
+                disablePerfectInvokeHook()
                 disablePerfectMouseHook()
                 disconnectGunActivation()
             end
@@ -1044,6 +1118,7 @@ function Combat:Create(options)
         settings.UtilsAutoEvadeMurderer = false
         settings.UtilsHitboxExpander = false
         disablePerfectShotHook()
+        disablePerfectInvokeHook()
         disablePerfectMouseHook()
         disconnectGunActivation()
         restoreAllHitboxes()
