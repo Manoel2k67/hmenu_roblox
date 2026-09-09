@@ -42,7 +42,9 @@ end
 
 function HMenu:Create(options)
     assert(options and type(options.Import) == "function", "HMenu requires an Import function")
+    local Schema = options.Import("HMenuSchema.lua")
     local Config = options.Import("HMenuConfig.lua")
+    Schema.ValidateConfig(Config)
     local Theme = {}
     for key, value in pairs(Config.Theme) do Theme[key] = value end
     local Parent = options.Parent or Players.LocalPlayer:WaitForChild("PlayerGui")
@@ -55,22 +57,72 @@ function HMenu:Create(options)
         return make("ImageLabel", properties, parent)
     end
     local categories = {}
+    local categoryIds = {}
+    local controlIds = {}
+    local runtimeModules = {}
     for _, path in ipairs(Config.CategoryModules) do
+        Schema.RequireModulePath(path, "Config.CategoryModules[]")
         local ok, category = pcall(options.Import, path)
-        if ok and type(category) == "table" then
-            table.insert(categories, category)
-        else
-            warn("[HMenu] Categoria ignorada:", path, category)
+        if not ok then
+            error("Falha ao importar categoria " .. tostring(path) .. ": " .. tostring(category), 0)
+        end
+        Schema.ValidateCategory(category, path, categoryIds, controlIds)
+        table.insert(categories, category)
+    end
+    if not categoryIds[Config.DefaultCategory] then
+        error("Config.DefaultCategory aponta para uma categoria inexistente: "
+            .. tostring(Config.DefaultCategory), 0)
+    end
+
+    for _, category in ipairs(categories) do
+        local path = category.RuntimeModule
+        if path and not runtimeModules[path] then
+            local ok, runtimeModule = pcall(options.Import, path)
+            if not ok then
+                error("Falha ao importar runtime " .. path .. ": " .. tostring(runtimeModule), 0)
+            end
+            if type(runtimeModule) ~= "table" or type(runtimeModule.Create) ~= "function" then
+                error(path .. " deve retornar uma tabela com função Create", 0)
+            end
+            runtimeModules[path] = runtimeModule
         end
     end
-    assert(#categories > 0, "No HMenu categories were loaded")
 
     if type(_G.__HMENU_CLEANUP) == "function" then pcall(_G.__HMENU_CLEANUP) end
     local connections = {}
-    local function connect(signal, callback)
+    local pageConnections = {}
+    local popupConnections = {}
+    local runtimes = {}
+    local activeDropdownPopup
+    local wallpaperRequest = 0
+    local themeSetter
+    local cameraViewportConnection
+    local destroyed = false
+    local cleanupFunction
+
+    local function connectTracked(bucket, signal, callback)
         local connection = signal:Connect(callback)
-        table.insert(connections, connection)
+        table.insert(bucket, connection)
         return connection
+    end
+
+    local function connect(signal, callback)
+        return connectTracked(connections, signal, callback)
+    end
+
+    local function connectPage(signal, callback)
+        return connectTracked(pageConnections, signal, callback)
+    end
+
+    local function connectPopup(signal, callback)
+        return connectTracked(popupConnections, signal, callback)
+    end
+
+    local function disconnectAll(bucket)
+        for index = #bucket, 1, -1 do
+            pcall(function() bucket[index]:Disconnect() end)
+            table.remove(bucket, index)
+        end
     end
 
     local previous = Parent:FindFirstChild(Config.GuiName)
@@ -81,42 +133,73 @@ function HMenu:Create(options)
     }, Parent)
     if type(protect_gui) == "function" then pcall(protect_gui, gui) end
 
-    local runtimes = {}
+    cleanupFunction = function()
+        if destroyed then return end
+        destroyed = true
+        wallpaperRequest = wallpaperRequest + 1
+        disconnectAll(popupConnections)
+        disconnectAll(pageConnections)
+        disconnectAll(connections)
+        if cameraViewportConnection then
+            pcall(function() cameraViewportConnection:Disconnect() end)
+            cameraViewportConnection = nil
+        end
+        if activeDropdownPopup then
+            activeDropdownPopup:Destroy()
+            activeDropdownPopup = nil
+        end
+        for index = #runtimes, 1, -1 do
+            local runtime = runtimes[index]
+            if type(runtime.Destroy) == "function" then
+                pcall(function() runtime:Destroy() end)
+            end
+            table.remove(runtimes, index)
+        end
+        if gui and gui.Parent then gui:Destroy() end
+        if _G.__HMENU_SET_THEME == themeSetter then _G.__HMENU_SET_THEME = nil end
+        if _G.__HMENU_CLEANUP == cleanupFunction then _G.__HMENU_CLEANUP = nil end
+    end
+    _G.__HMENU_CLEANUP = cleanupFunction
+
     for _, category in ipairs(categories) do
         if category.RuntimeModule then
-            local ok, runtimeModule = pcall(options.Import, category.RuntimeModule)
-            if ok and type(runtimeModule) == "table" and type(runtimeModule.Create) == "function" then
-                local runtimeOk, runtime = pcall(function()
-                    return runtimeModule:Create({ Parent = Parent })
-                end)
-                if runtimeOk and runtime then
-                    table.insert(runtimes, runtime)
-                    for _, section in ipairs(category.Sections or {}) do
-                        for _, control in ipairs(section.Controls or {}) do
-                            if control.OptionsSource and type(runtime.GetOptions) == "function" then
-                                local optionsSource = control.OptionsSource
-                                control.Options = function()
-                                    return runtime:GetOptions(optionsSource)
-                                end
-                            end
-                            if control.Setting then
-                                local settingName = control.Setting
-                                local settingRuntime = runtime
-                                local previousCallback = control.Callback
-                                control.Callback = function(value, state)
-                                    settingRuntime:Set(settingName, value)
-                                    if type(previousCallback) == "function" then
-                                        previousCallback(value, state)
-                                    end
-                                end
+            local runtimeModule = runtimeModules[category.RuntimeModule]
+            local runtimeOk, runtime = pcall(function()
+                return runtimeModule:Create({ Parent = Parent })
+            end)
+            if not runtimeOk or type(runtime) ~= "table" or type(runtime.Set) ~= "function"
+                or type(runtime.Destroy) ~= "function" then
+                cleanupFunction()
+                error("Falha ao iniciar runtime " .. category.RuntimeModule .. ": "
+                    .. tostring(runtime), 0)
+            end
+
+            table.insert(runtimes, runtime)
+            for _, section in ipairs(category.Sections) do
+                for _, control in ipairs(section.Controls) do
+                    if control.OptionsSource then
+                        if type(runtime.GetOptions) ~= "function" then
+                            cleanupFunction()
+                            error(category.RuntimeModule .. " precisa implementar GetOptions para "
+                                .. control.Id, 0)
+                        end
+                        local optionsSource = control.OptionsSource
+                        control.Options = function()
+                            return runtime:GetOptions(optionsSource)
+                        end
+                    end
+                    if control.Setting then
+                        local settingName = control.Setting
+                        local settingRuntime = runtime
+                        local previousCallback = control.Callback
+                        control.Callback = function(value, state)
+                            settingRuntime:Set(settingName, value)
+                            if type(previousCallback) == "function" then
+                                previousCallback(value, state)
                             end
                         end
                     end
-                else
-                    warn("[HMenu] Runtime não iniciado:", category.RuntimeModule, runtime)
                 end
-            else
-                warn("[HMenu] Runtime não carregado:", category.RuntimeModule, runtimeModule)
             end
         end
     end
@@ -270,9 +353,9 @@ function HMenu:Create(options)
     local state = {}
     local activeButton, activeCategory
     local navButtons = {}
-    local activeDropdownPopup
 
     local function closeDropdown()
+        disconnectAll(popupConnections)
         if activeDropdownPopup then
             activeDropdownPopup:Destroy()
             activeDropdownPopup = nil
@@ -289,7 +372,7 @@ function HMenu:Create(options)
 
     local function createToggle(parent, control, row)
         local saved = state[control.Id or control.Label]
-        local enabled = saved == true
+        local enabled = saved == nil and control.Default == true or saved == true
         local track = make("Frame", {
             Size = UDim2.fromOffset(36, 19), Position = UDim2.new(1, -50, 0.5, -10),
             BackgroundColor3 = enabled and Theme.Accent or Theme.Control, BorderSizePixel = 0,
@@ -305,7 +388,7 @@ function HMenu:Create(options)
             Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "", AutoButtonColor = false,
         }, row)
         state[control.Id or control.Label] = enabled
-        connect(hit.MouseButton1Click, function()
+        connectPage(hit.MouseButton1Click, function()
             enabled = not enabled
             TweenService:Create(track, TweenInfo.new(0.14), { BackgroundColor3 = enabled and Theme.Accent or Theme.Control }):Play()
             TweenService:Create(knob, TweenInfo.new(0.14), { Position = enabled and UDim2.fromOffset(20, 3) or UDim2.fromOffset(3, 3) }):Play()
@@ -350,18 +433,18 @@ function HMenu:Create(options)
             Size = UDim2.new(1, 12, 0, 22), Position = UDim2.fromOffset(-6, -9),
             BackgroundTransparency = 1, Text = "", AutoButtonColor = false,
         }, bar)
-        connect(hit.InputBegan, function(inputObject)
+        connectPage(hit.InputBegan, function(inputObject)
             if inputObject.UserInputType == Enum.UserInputType.MouseButton1 or inputObject.UserInputType == Enum.UserInputType.Touch then
                 dragging = true
                 update(inputObject.Position.X)
             end
         end)
-        connect(UserInputService.InputChanged, function(inputObject)
+        connectPage(UserInputService.InputChanged, function(inputObject)
             if dragging and (inputObject.UserInputType == Enum.UserInputType.MouseMovement or inputObject.UserInputType == Enum.UserInputType.Touch) then
                 update(inputObject.Position.X)
             end
         end)
-        connect(UserInputService.InputEnded, function(inputObject)
+        connectPage(UserInputService.InputEnded, function(inputObject)
             if inputObject.UserInputType == Enum.UserInputType.MouseButton1 or inputObject.UserInputType == Enum.UserInputType.Touch then dragging = false end
         end)
         state[control.Id or control.Label] = value
@@ -390,7 +473,7 @@ function HMenu:Create(options)
         round(button, 5)
         stroke(button, Theme.Border, 0.55)
         state[control.Id or control.Label] = choices[index]
-        connect(button.MouseButton1Click, function()
+        connectPage(button.MouseButton1Click, function()
             local current = choices[index]
             choices = readChoices()
             if not control.UseList then
@@ -441,17 +524,17 @@ function HMenu:Create(options)
                     ZIndex = 82, LayoutOrder = optionIndex,
                 }, list)
                 round(optionButton, 5)
-                connect(optionButton.MouseButton1Click, function()
+                connectPopup(optionButton.MouseButton1Click, function()
                     index = optionIndex
                     button.Text = tostring(option) .. "  v"
                     fire(control, option)
                     closeDropdown()
                 end)
-                connect(optionButton.MouseEnter, function()
+                connectPopup(optionButton.MouseEnter, function()
                     optionButton.BackgroundTransparency = 0.35
                     optionButton.TextColor3 = Theme.Text
                 end)
-                connect(optionButton.MouseLeave, function()
+                connectPopup(optionButton.MouseLeave, function()
                     optionButton.BackgroundTransparency = optionIndex == index and 0.25 or 1
                     optionButton.TextColor3 = optionIndex == index and Theme.Text or Theme.Muted
                 end)
@@ -467,7 +550,7 @@ function HMenu:Create(options)
         }, row)
         round(button, 5)
         stroke(button, Theme.Border, 0.45)
-        connect(button.MouseButton1Click, function()
+        connectPage(button.MouseButton1Click, function()
             fire(control, true)
             button.Text = "Concluído"
             task.delay(1, function() if button.Parent then button.Text = control.ButtonText or "Executar" end end)
@@ -501,10 +584,10 @@ function HMenu:Create(options)
         elseif control.Kind == "Dropdown" then createChoice(control, row)
         elseif control.Kind == "Button" then createAction(control, row)
         end
-        connect(row.MouseEnter, function()
+        connectPage(row.MouseEnter, function()
             TweenService:Create(row, TweenInfo.new(0.12), { BackgroundTransparency = 0.08 }):Play()
         end)
-        connect(row.MouseLeave, function()
+        connectPage(row.MouseLeave, function()
             TweenService:Create(row, TweenInfo.new(0.12), { BackgroundTransparency = 0.17 }):Play()
         end)
         return row
@@ -512,6 +595,7 @@ function HMenu:Create(options)
 
     local function clearPage()
         closeDropdown()
+        disconnectAll(pageConnections)
         for _, child in ipairs(page:GetChildren()) do
             if child ~= pageLayout and not child:IsA("UIPadding") then child:Destroy() end
         end
@@ -641,6 +725,7 @@ function HMenu:Create(options)
 
     local hidden = false
     local function setVisible(visible)
+        if destroyed or not root.Parent then return end
         if not visible then closeDropdown() end
         hidden = not visible
         root.Visible = visible
@@ -654,6 +739,7 @@ function HMenu:Create(options)
     local dragging, dragStart, startPosition = false, nil, nil
     connect(header.InputBegan, function(inputObject)
         if inputObject.UserInputType == Enum.UserInputType.MouseButton1 or inputObject.UserInputType == Enum.UserInputType.Touch then
+            closeDropdown()
             dragging, dragStart, startPosition = true, inputObject.Position, root.Position
         end
     end)
@@ -667,7 +753,6 @@ function HMenu:Create(options)
         if inputObject.UserInputType == Enum.UserInputType.MouseButton1 or inputObject.UserInputType == Enum.UserInputType.Touch then dragging = false end
     end)
 
-    local cameraConnection
     local function updateScale()
         local camera = Workspace.CurrentCamera
         if not camera then return end
@@ -675,11 +760,20 @@ function HMenu:Create(options)
         local fit = math.min((viewport.X - Config.Window.Margin) / Config.Window.Width, (viewport.Y - Config.Window.Margin) / Config.Window.Height, 1)
         scale.Scale = math.max(fit, Config.Window.MinScale)
     end
-    if Workspace.CurrentCamera then cameraConnection = connect(Workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"), updateScale) end
-    updateScale()
+    local function bindCamera()
+        if cameraViewportConnection then
+            pcall(function() cameraViewportConnection:Disconnect() end)
+            cameraViewportConnection = nil
+        end
+        if Workspace.CurrentCamera then
+            cameraViewportConnection = Workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(updateScale)
+        end
+        updateScale()
+    end
+    connect(Workspace:GetPropertyChangedSignal("CurrentCamera"), bindCamera)
+    bindCamera()
 
     local currentThemeName = "Default"
-    local wallpaperRequest = 0
     local wallpaperAssets = {}
     local themeKeys = {
         "Window", "WindowHighlight", "WindowDark", "Sidebar", "Header",
@@ -721,24 +815,61 @@ function HMenu:Create(options)
         end
     end
 
+    local function assetBaseUrls()
+        if type(options.AssetBaseUrls) == "table" and #options.AssetBaseUrls > 0 then
+            return options.AssetBaseUrls
+        end
+        if type(options.BaseUrl) == "string" and options.BaseUrl ~= "" then
+            return { options.BaseUrl }
+        end
+        return {}
+    end
+
+    local function downloadWallpaper(path)
+        local lastError = "nenhuma fonte de assets foi configurada"
+        local version = tostring(options.AssetVersion or Config.Version or "stable")
+        for attempt = 1, 3 do
+            for _, configuredBaseUrl in ipairs(assetBaseUrls()) do
+                local baseUrl = configuredBaseUrl
+                if string.sub(baseUrl, -1) ~= "/" then baseUrl = baseUrl .. "/" end
+                local ok, data = pcall(function()
+                    return game:HttpGet(baseUrl .. path .. "?v=" .. version, true)
+                end)
+                if ok and type(data) == "string" and string.sub(data, 1, 8) == "\137PNG\r\n\26\n" then
+                    return data
+                end
+                if ok then
+                    lastError = "a resposta não é uma imagem PNG válida"
+                else
+                    lastError = tostring(data)
+                end
+            end
+            if attempt < 3 then task.wait(0.75 * (2 ^ (attempt - 1))) end
+        end
+        return nil, lastError
+    end
+
     local function wallpaperAsset(themeName, definition)
         if wallpaperAssets[themeName] then return wallpaperAssets[themeName] end
         local assetLoader = type(getcustomasset) == "function" and getcustomasset
             or (type(getsynasset) == "function" and getsynasset or nil)
         if not assetLoader or type(writefile) ~= "function" then return nil end
 
-        local baseUrl = options.BaseUrl
-        if type(baseUrl) ~= "string" or baseUrl == "" then return nil end
-        if string.sub(baseUrl, -1) ~= "/" then baseUrl = baseUrl .. "/" end
-
         local ok, asset = pcall(function()
             local directory = "HMenuThemes"
-            local localPath = "HMenuTheme-" .. themeName .. ".png"
+            local version = tostring(options.AssetVersion or Config.Version or "stable")
+                :gsub("[^%w%-_%.]", "_")
+            local localPath = "HMenuTheme-" .. themeName .. "-" .. version .. ".png"
             if type(makefolder) == "function" then
                 pcall(function() makefolder(directory) end)
-                localPath = directory .. "/" .. themeName .. ".png"
+                localPath = directory .. "/" .. themeName .. "-" .. version .. ".png"
             end
-            local data = game:HttpGet(baseUrl .. definition.Wallpaper .. "?v=" .. tostring(os.time()), true)
+            if type(isfile) == "function" and isfile(localPath) then
+                local cachedOk, cachedAsset = pcall(assetLoader, localPath)
+                if cachedOk and cachedAsset then return cachedAsset end
+            end
+            local data, downloadError = downloadWallpaper(definition.Wallpaper)
+            if not data then error(downloadError, 0) end
             writefile(localPath, data)
             return assetLoader(localPath)
         end)
@@ -802,27 +933,13 @@ function HMenu:Create(options)
         refreshFavoriteOrder()
     end
 
-    local themeSetter = function(themeName)
+    themeSetter = function(themeName)
         applyTheme(tostring(themeName or "Default"))
     end
     _G.__HMENU_SET_THEME = themeSetter
 
-    local function cleanup()
-        wallpaperRequest = wallpaperRequest + 1
-        for _, runtime in ipairs(runtimes) do
-            if type(runtime.Destroy) == "function" then pcall(function() runtime:Destroy() end) end
-        end
-        runtimes = {}
-        for _, connection in ipairs(connections) do pcall(function() connection:Disconnect() end) end
-        connections = {}
-        if gui and gui.Parent then gui:Destroy() end
-        if _G.__HMENU_SET_THEME == themeSetter then _G.__HMENU_SET_THEME = nil end
-        if _G.__HMENU_CLEANUP == cleanup then _G.__HMENU_CLEANUP = nil end
-    end
-    _G.__HMENU_CLEANUP = cleanup
-
     print("[HMenu] Aberto. Use RightShift para ocultar ou mostrar.")
-    return { Gui = gui, State = state, Destroy = cleanup, SetVisible = setVisible }
+    return { Gui = gui, State = state, Destroy = cleanupFunction, SetVisible = setVisible }
 end
 
 return HMenu

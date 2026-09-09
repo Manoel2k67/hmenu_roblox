@@ -1,18 +1,28 @@
 -- HMenu bootstrap. Public entry point:
--- loadstring(game:HttpGet("https://raw.githubusercontent.com/Manoel2k67/hmenu_roblox/main/KeySystem.lua?v=" .. tostring(os.time()), true))()
+-- loadstring(game:HttpGet("https://raw.githubusercontent.com/Manoel2k67/hmenu_roblox/main/KeySystem.lua?v=1.1.0", true))()
 
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
-local REPOSITORY = "https://raw.githubusercontent.com/Manoel2k67/hmenu_roblox/main/"
+local RELEASE_VERSION = "1.1.0"
+local BUNDLE_PATH = "dist/HMenu.bundle.lua"
+local REPOSITORIES = {
+    "https://raw.githubusercontent.com/Manoel2k67/hmenu_roblox/main/",
+    "https://cdn.jsdelivr.net/gh/Manoel2k67/hmenu_roblox@main/",
+}
+local MAX_DOWNLOAD_ATTEMPTS = 4
+local RETRY_BASE_DELAY = 0.75
 local GUI_NAME = "HMenuKeySystem"
 local ACCEPT_ANY_NON_EMPTY_KEY = true -- Temporary mock validation.
 local VALID_KEYS = { "HMENU-DEMO" }
-local GET_KEY_URL = "https://discord.gg/seulink"
-local CACHE_BUSTER = tostring(os.time()) .. "-" .. tostring(math.random(100000, 999999))
+local GET_KEY_URL = nil -- Configure an HTTPS community/key URL before production.
+local HAS_KEY_URL = type(GET_KEY_URL) == "string" and string.match(GET_KEY_URL, "^https://") ~= nil
 
+if type(_G.__HMENU_KEY_CLEANUP) == "function" then
+    pcall(_G.__HMENU_KEY_CLEANUP)
+end
 if type(_G.__HMENU_CLEANUP) == "function" then
     pcall(_G.__HMENU_CLEANUP)
 end
@@ -74,7 +84,7 @@ new("UIGradient", {
 
 new("TextLabel", {
     Size = UDim2.new(1, -62, 0, 28), Position = UDim2.fromOffset(22, 17),
-    BackgroundTransparency = 1, Text = "HMenu  |  Access",
+    BackgroundTransparency = 1, Text = "HMenu  |  Access v" .. RELEASE_VERSION,
     TextColor3 = Color3.fromRGB(239, 244, 255), Font = Enum.Font.GothamMedium,
     TextSize = 15, TextXAlignment = Enum.TextXAlignment.Left,
 }, window)
@@ -123,13 +133,14 @@ local getKey = new("TextButton", {
     Size = UDim2.fromOffset(150, 25), Position = UDim2.fromOffset(17, 239),
     BackgroundTransparency = 1, Text = "Obter chave / comunidade",
     TextColor3 = Color3.fromRGB(130, 168, 242), Font = Enum.Font.Gotham,
-    TextSize = 11, AutoButtonColor = false,
+    TextSize = 11, AutoButtonColor = false, Visible = HAS_KEY_URL,
 }, window)
 local status = new("TextLabel", {
-    Size = UDim2.new(1, -190, 0, 25), Position = UDim2.new(0, 169, 0, 239),
+    Size = HAS_KEY_URL and UDim2.new(1, -190, 0, 25) or UDim2.new(1, -44, 0, 25),
+    Position = HAS_KEY_URL and UDim2.new(0, 169, 0, 239) or UDim2.fromOffset(22, 239),
     BackgroundTransparency = 1, Text = "Qualquer chave funciona no modo demo",
     TextColor3 = Color3.fromRGB(128, 145, 178), Font = Enum.Font.Gotham,
-    TextSize = 10, TextXAlignment = Enum.TextXAlignment.Right,
+    TextSize = 10, TextXAlignment = HAS_KEY_URL and Enum.TextXAlignment.Right or Enum.TextXAlignment.Center,
 }, window)
 
 local busy = false
@@ -143,43 +154,137 @@ local function validKey(value)
     return false
 end
 
-local function import(path)
-    local source = game:HttpGet(REPOSITORY .. path .. "?v=" .. CACHE_BUSTER, true)
-    local chunk, compileError = loadstring(source, "@HMenu/" .. path)
-    assert(chunk, compileError)
-    return chunk()
+local function payloadError(source)
+    if type(source) ~= "string" or #source == 0 then
+        return "resposta vazia"
+    end
+
+    if string.sub(source, 1, 3) == "\239\187\191" then
+        source = string.sub(source, 4)
+    end
+
+    local prefix = string.lower(string.sub(source, 1, 512))
+    local firstCharacter = string.match(source, "^%s*(.)")
+    if firstCharacter == "<" or string.find(prefix, "<!doctype", 1, true)
+        or string.find(prefix, "<html", 1, true) then
+        return "servidor retornou HTML em vez de Lua"
+    end
+    if string.find(prefix, "backend.max_conn", 1, true) then
+        return "servidor temporariamente sobrecarregado"
+    end
+    return nil, source
+end
+
+local function downloadBundle(onAttempt)
+    if type(loadstring) ~= "function" then
+        error("este executor não disponibiliza loadstring", 0)
+    end
+
+    local lastError = "falha de rede desconhecida"
+    for attempt = 1, MAX_DOWNLOAD_ATTEMPTS do
+        for _, repository in ipairs(REPOSITORIES) do
+            if onAttempt then onAttempt(attempt) end
+            local url = repository .. BUNDLE_PATH .. "?v=" .. RELEASE_VERSION
+            local requestOk, response = pcall(function()
+                return game:HttpGet(url, true)
+            end)
+
+            if requestOk then
+                local responseError, source = payloadError(response)
+                if not responseError then
+                    local chunk, compileError = loadstring(source, "@HMenu/" .. BUNDLE_PATH)
+                    if chunk then return chunk, repository end
+                    lastError = "bundle inválido: " .. tostring(compileError)
+                else
+                    lastError = responseError
+                end
+            else
+                lastError = tostring(response)
+            end
+        end
+
+        if attempt < MAX_DOWNLOAD_ATTEMPTS then
+            task.wait(RETRY_BASE_DELAY * (2 ^ (attempt - 1)))
+        end
+    end
+
+    error("não foi possível baixar o HMenu após " .. tostring(MAX_DOWNLOAD_ATTEMPTS)
+        .. " tentativas: " .. lastError, 0)
 end
 
 local function setStatus(message, color)
-    status.Text, status.TextColor3 = message, color
+    if status and status.Parent then
+        status.Text, status.TextColor3 = message, color
+    end
 end
 
+local connections = {}
+local destroyed = false
+local cleanupFunction
+local function connect(signal, callback)
+    local connection = signal:Connect(callback)
+    table.insert(connections, connection)
+    return connection
+end
+
+local function cleanup()
+    if destroyed then return end
+    destroyed = true
+    for _, connection in ipairs(connections) do
+        pcall(function() connection:Disconnect() end)
+    end
+    connections = {}
+    if gui and gui.Parent then gui:Destroy() end
+    if _G.__HMENU_KEY_CLEANUP == cleanupFunction then
+        _G.__HMENU_KEY_CLEANUP = nil
+    end
+end
+cleanupFunction = cleanup
+_G.__HMENU_KEY_CLEANUP = cleanupFunction
+
 local function openMenu()
-    if busy then return end
+    if busy or destroyed then return end
     if not validKey(input.Text) then
         setStatus("Digite uma chave", Color3.fromRGB(255, 177, 98))
         return
     end
     busy = true
     submit.Text = "Carregando..."
-    setStatus("Chave válida", Color3.fromRGB(105, 221, 160))
+    setStatus("Preparando download...", Color3.fromRGB(105, 221, 160))
+    local cleanupBeforeAttempt = rawget(_G, "__HMENU_CLEANUP")
     local ok, result = pcall(function()
-        local menu = import("HMenu.lua")
-        return menu:Create({ BaseUrl = REPOSITORY, Import = import, Parent = guiParent })
+        local chunk = downloadBundle(function(attempt)
+            setStatus("Baixando menu (tentativa " .. tostring(attempt) .. "/"
+                .. tostring(MAX_DOWNLOAD_ATTEMPTS) .. ")...", Color3.fromRGB(130, 168, 242))
+        end)
+        local bundle = chunk()
+        assert(type(bundle) == "table" and type(bundle.Create) == "function",
+            "o bundle baixado não expõe uma função Create")
+        setStatus("Inicializando menu...", Color3.fromRGB(105, 221, 160))
+        return bundle:Create({
+            Parent = guiParent,
+            AssetBaseUrls = REPOSITORIES,
+            AssetVersion = RELEASE_VERSION,
+        })
     end)
     if not ok then
+        local partialCleanup = rawget(_G, "__HMENU_CLEANUP")
+        if type(partialCleanup) == "function" and partialCleanup ~= cleanupBeforeAttempt then
+            pcall(partialCleanup)
+        end
         warn("[HMenu] Não foi possível abrir o menu:", result)
         submit.Text, busy = "Tentar novamente", false
-        setStatus("Erro ao carregar; veja o console", Color3.fromRGB(255, 113, 122))
+        setStatus("Falha ao carregar. Tente novamente.", Color3.fromRGB(255, 113, 122))
         return
     end
-    gui:Destroy()
+    cleanup()
 end
 
-submit.MouseButton1Click:Connect(openMenu)
-input.FocusLost:Connect(function(enterPressed) if enterPressed then openMenu() end end)
-close.MouseButton1Click:Connect(function() gui:Destroy() end)
-getKey.MouseButton1Click:Connect(function()
+connect(submit.MouseButton1Click, openMenu)
+connect(input.FocusLost, function(enterPressed) if enterPressed then openMenu() end end)
+connect(close.MouseButton1Click, cleanup)
+connect(getKey.MouseButton1Click, function()
+    if not HAS_KEY_URL then return end
     if type(setclipboard) == "function" then
         setclipboard(GET_KEY_URL)
         setStatus("Link copiado", Color3.fromRGB(105, 221, 160))
@@ -187,14 +292,16 @@ getKey.MouseButton1Click:Connect(function()
         setStatus(GET_KEY_URL, Color3.fromRGB(130, 168, 242))
     end
 end)
-submit.MouseEnter:Connect(function()
+connect(submit.MouseEnter, function()
     TweenService:Create(submit, TweenInfo.new(0.12), { BackgroundColor3 = Color3.fromRGB(108, 153, 239) }):Play()
 end)
-submit.MouseLeave:Connect(function()
+connect(submit.MouseLeave, function()
     TweenService:Create(submit, TweenInfo.new(0.12), { BackgroundColor3 = Color3.fromRGB(90, 137, 231) }):Play()
 end)
-UserInputService.InputBegan:Connect(function(key, processed)
-    if not processed and key.KeyCode == Enum.KeyCode.Escape and gui.Parent then gui:Destroy() end
+connect(UserInputService.InputBegan, function(key, processed)
+    if not processed and key.KeyCode == Enum.KeyCode.Escape then cleanup() end
 end)
-task.defer(function() input:CaptureFocus() end)
-print("[HMenu] KeySystem pronto (validação demo ativa)")
+task.defer(function()
+    if not destroyed and input.Parent then input:CaptureFocus() end
+end)
+print("[HMenu] KeySystem v" .. RELEASE_VERSION .. " pronto (validação demo ativa)")
