@@ -1,6 +1,6 @@
 -- AUTO-GENERATED FILE. DO NOT EDIT DIRECTLY.
 -- Run tools/Build-Bundle.ps1 after changing a source module.
--- Release: 1.1.4
+-- Release is read from VERSION at runtime.
 
 local __modules = {}
 
@@ -4979,7 +4979,7 @@ end
 -- END runtime/Visuals.lua
 
 local Bundle = {
-    Version = "1.1.4",
+    Version = tostring(rawget(_G, "__HMENU_RELEASE_VERSION") or "unknown"),
     ModuleCount = 24,
 }
 

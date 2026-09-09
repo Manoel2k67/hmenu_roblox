@@ -1,5 +1,5 @@
 -- HMenu bootstrap. Public entry point:
--- loadstring(game:HttpGet("https://raw.githubusercontent.com/Manoel2k67/hmenu_roblox/main/KeySystem.lua?v=1.1.4", true))()
+-- loadstring(game:HttpGet("https://raw.githubusercontent.com/Manoel2k67/hmenu_roblox/main/KeySystem.lua", true))()
 
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")

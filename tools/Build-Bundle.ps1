@@ -26,23 +26,8 @@ if ($releaseVersion -notmatch '^\d+\.\d+\.\d+$') {
 $configSource = Read-Utf8File "HMenuConfig.lua"
 $keySystemSource = Read-Utf8File "KeySystem.lua"
 $readmeSource = Read-Utf8File "README.md"
-$expectedLoaderComment = 'main/KeySystem.lua?v=' + $releaseVersion
-if ($keySystemSource -notmatch [regex]::Escape($expectedLoaderComment)) {
-    if ($Check) { throw "O exemplo de carregamento em KeySystem.lua diverge de VERSION." }
-    $keySystemSource = [regex]::Replace($keySystemSource,
-        'main/KeySystem\.lua\?v=[0-9A-Za-z._-]+',
-        $expectedLoaderComment, 1)
-    [IO.File]::WriteAllText((Join-Path $repoRoot "KeySystem.lua"), $keySystemSource, $utf8NoBom)
-}
-$readmeVersionMatches = [regex]::Matches($readmeSource, 'KeySystem\.lua\?v=([0-9A-Za-z._-]+)')
-if ($readmeVersionMatches.Count -lt 2) {
-    throw "O bootstrap do README deve conter as duas fontes versionadas."
-}
-if ($readmeVersionMatches | Where-Object { $_.Groups[1].Value -ne $releaseVersion }) {
-    if ($Check) { throw "A versao do bootstrap no README diverge de VERSION." }
-    $readmeSource = [regex]::Replace($readmeSource, '(KeySystem\.lua\?v=)[0-9A-Za-z._-]+',
-        ('${1}' + $releaseVersion))
-    [IO.File]::WriteAllText((Join-Path $repoRoot "README.md"), $readmeSource, $utf8NoBom)
+if ([regex]::Matches($readmeSource, 'KeySystem\.lua').Count -lt 2) {
+    throw "O bootstrap do README deve conter as duas fontes."
 }
 $configSource = Read-Utf8File "HMenuConfig.lua"
 $keySystemSource = Read-Utf8File "KeySystem.lua"
@@ -67,7 +52,7 @@ function Add-Line([string]$line = "") {
 
 Add-Line "-- AUTO-GENERATED FILE. DO NOT EDIT DIRECTLY."
 Add-Line "-- Run tools/Build-Bundle.ps1 after changing a source module."
-Add-Line "-- Release: $releaseVersion"
+Add-Line "-- Release is read from VERSION at runtime."
 Add-Line
 Add-Line "local __modules = {}"
 Add-Line
@@ -83,7 +68,7 @@ foreach ($modulePath in $modulePaths) {
 }
 
 Add-Line "local Bundle = {"
-Add-Line "    Version = `"$releaseVersion`","
+Add-Line "    Version = tostring(rawget(_G, `"__HMENU_RELEASE_VERSION`") or `"unknown`"),"
 Add-Line "    ModuleCount = $($modulePaths.Count),"
 Add-Line "}"
 Add-Line
