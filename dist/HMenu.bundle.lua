@@ -1,6 +1,6 @@
 -- AUTO-GENERATED FILE. DO NOT EDIT DIRECTLY.
 -- Run tools/Build-Bundle.ps1 after changing a source module.
--- Release: 1.1.0
+-- Release: 1.1.1
 
 local __modules = {}
 
@@ -9,7 +9,7 @@ __modules["HMenuConfig.lua"] = function()
 local Config = {}
 
 Config.GuiName = "HMenu"
-Config.Version = "v1.1.0"
+Config.Version = "v1.1.1"
 Config.ToggleKey = Enum.KeyCode.RightShift
 Config.DefaultCategory = "Main"
 Config.Window = { Width = 720, Height = 520, MinScale = 0.68, Margin = 24 }
@@ -4975,7 +4975,7 @@ end
 -- END runtime/Visuals.lua
 
 local Bundle = {
-    Version = "1.1.0",
+    Version = "1.1.1",
     ModuleCount = 24,
 }
 
