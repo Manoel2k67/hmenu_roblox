@@ -253,9 +253,8 @@ local function openMenu()
     setStatus("Preparando download...", Color3.fromRGB(105, 221, 160))
     local cleanupBeforeAttempt = rawget(_G, "__HMENU_CLEANUP")
     local ok, result = pcall(function()
-        local chunk = downloadBundle(function(attempt)
-            setStatus("Baixando menu (tentativa " .. tostring(attempt) .. "/"
-                .. tostring(MAX_DOWNLOAD_ATTEMPTS) .. ")...", Color3.fromRGB(130, 168, 242))
+        local chunk = downloadBundle(function()
+            setStatus("Baixando menu...", Color3.fromRGB(130, 168, 242))
         end)
         local bundle = chunk()
         assert(type(bundle) == "table" and type(bundle.Create) == "function",
