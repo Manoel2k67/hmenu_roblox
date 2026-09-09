@@ -66,30 +66,30 @@ function TrollRuntime:Create()
         if (targetDebounce[targetPlayer] or 0) > now then return end
         targetDebounce[targetPlayer] = now + 1
 
-        local sourceRoot, sourceHumanoid = livingRoot(localPlayer.Character)
-        local targetRoot = livingRoot(targetPlayer.Character)
-        if not sourceRoot or not sourceHumanoid or not targetRoot then return end
+        local targetRoot, targetHumanoid = livingRoot(targetPlayer.Character)
+        local localRoot = livingRoot(localPlayer.Character)
+        if not targetRoot or not targetHumanoid or not localRoot then return end
 
         flinging = true
         _G.__HMENU_TROLL_IMPULSE = impulseMarker
         actionToken = actionToken + 1
         local token = actionToken
-        local savedCFrame = sourceRoot.CFrame
-        local savedLinearVelocity = sourceRoot.AssemblyLinearVelocity
-        local savedAngularVelocity = sourceRoot.AssemblyAngularVelocity
-        local savedAutoRotate = sourceHumanoid.AutoRotate
+        local savedCFrame = targetRoot.CFrame
+        local savedLinearVelocity = targetRoot.AssemblyLinearVelocity
+        local savedAngularVelocity = targetRoot.AssemblyAngularVelocity
+        local savedAutoRotate = targetHumanoid.AutoRotate
         local restored = false
 
         local function restore()
             if restored then return end
             restored = true
-            if sourceRoot and sourceRoot.Parent then
-                sourceRoot.AssemblyLinearVelocity = savedLinearVelocity
-                sourceRoot.AssemblyAngularVelocity = savedAngularVelocity
-                sourceRoot.CFrame = savedCFrame
+            if targetRoot and targetRoot.Parent then
+                targetRoot.AssemblyLinearVelocity = savedLinearVelocity
+                targetRoot.AssemblyAngularVelocity = savedAngularVelocity
+                targetRoot.CFrame = savedCFrame
             end
-            if sourceHumanoid and sourceHumanoid.Parent then
-                sourceHumanoid.AutoRotate = savedAutoRotate
+            if targetHumanoid and targetHumanoid.Parent then
+                targetHumanoid.AutoRotate = savedAutoRotate
             end
             if _G.__HMENU_TROLL_IMPULSE == impulseMarker then
                 _G.__HMENU_TROLL_IMPULSE = nil
@@ -102,25 +102,25 @@ function TrollRuntime:Create()
         task.spawn(function()
             local ok, err = pcall(function()
                 local startedAt = os.clock()
-                sourceHumanoid.AutoRotate = false
+                targetHumanoid.AutoRotate = false
 
                 while not destroyed and settings.TouchFling and token == actionToken
                     and os.clock() - startedAt < 0.28 do
                     local currentTargetRoot = livingRoot(targetPlayer.Character)
-                    if not sourceRoot.Parent or not currentTargetRoot then break end
+                    local currentLocalRoot = livingRoot(localPlayer.Character)
+                    if not currentTargetRoot or not currentLocalRoot then break end
 
-                    local horizontal = currentTargetRoot.Position - savedCFrame.Position
+                    local horizontal = currentTargetRoot.Position - currentLocalRoot.Position
                     horizontal = Vector3.new(horizontal.X, 0, horizontal.Z)
                     if horizontal.Magnitude < 0.05 then
-                        horizontal = Vector3.new(currentTargetRoot.CFrame.LookVector.X, 0,
-                            currentTargetRoot.CFrame.LookVector.Z)
+                        horizontal = Vector3.new(currentLocalRoot.CFrame.LookVector.X, 0,
+                            currentLocalRoot.CFrame.LookVector.Z)
                     end
                     local direction = horizontal.Magnitude > 0.05 and horizontal.Unit or Vector3.new(1, 0, 0)
 
-                    sourceRoot.CFrame = currentTargetRoot.CFrame * CFrame.new(0, 0, 0.65)
-                    sourceRoot.AssemblyLinearVelocity = Vector3.new(direction.X * 9000, 12000,
+                    currentTargetRoot.AssemblyLinearVelocity = Vector3.new(direction.X * 9000, 12000,
                         direction.Z * 9000)
-                    sourceRoot.AssemblyAngularVelocity = Vector3.new(0, 100000, 0)
+                    currentTargetRoot.AssemblyAngularVelocity = Vector3.new(0, 100000, 0)
                     RunService.Heartbeat:Wait()
                 end
             end)
