@@ -60,7 +60,7 @@ function TrollRuntime:Create()
     end
 
     local function fling(targetPlayer)
-        if destroyed or not settings.TouchFling or flinging or targetPlayer == localPlayer then return end
+        if destroyed or not settings.TouchFling or flinging or not targetPlayer or targetPlayer == localPlayer then return end
 
         local now = os.clock()
         if (targetDebounce[targetPlayer] or 0) > now then return end
@@ -69,6 +69,7 @@ function TrollRuntime:Create()
         local targetRoot, targetHumanoid = livingRoot(targetPlayer.Character)
         local localRoot = livingRoot(localPlayer.Character)
         if not targetRoot or not targetHumanoid or not localRoot then return end
+        if targetPlayer.Character == localPlayer.Character then return end
 
         flinging = true
         _G.__HMENU_TROLL_IMPULSE = impulseMarker
@@ -132,6 +133,7 @@ function TrollRuntime:Create()
 
     local function onTouched(part)
         if destroyed or not settings.TouchFling or not part or not part.Parent then return end
+        if localPlayer.Character and part:IsDescendantOf(localPlayer.Character) then return end
         local targetPlayer = playerFromPart(part)
         if targetPlayer and targetPlayer ~= localPlayer then fling(targetPlayer) end
     end
