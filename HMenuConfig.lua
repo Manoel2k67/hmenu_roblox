@@ -108,7 +108,7 @@ Config.CategoryModules = {
     "categories/Main.lua", "categories/Visuals.lua", "categories/Combat.lua",
     "categories/Player.lua", "categories/Farm.lua", "categories/Whitelist.lua",
     "categories/Emotes.lua", "categories/Teleport.lua", "categories/Misc.lua",
-    "categories/Atmosphere.lua", "categories/Credits.lua",
+    "categories/Troll.lua", "categories/Atmosphere.lua", "categories/Credits.lua",
 }
 
 return Config
