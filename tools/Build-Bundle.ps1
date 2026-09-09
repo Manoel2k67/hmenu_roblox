@@ -55,7 +55,7 @@ if ($readmeVersionMatches.Count -lt 2) {
 if ($readmeVersionMatches | Where-Object { $_.Groups[1].Value -ne $releaseVersion }) {
     if ($Check) { throw "A versao do bootstrap no README diverge de VERSION." }
     $readmeSource = [regex]::Replace($readmeSource, '(KeySystem\.lua\?v=)[0-9A-Za-z._-]+',
-        ('$1' + $releaseVersion))
+        ('${1}' + $releaseVersion))
     [IO.File]::WriteAllText((Join-Path $repoRoot "README.md"), $readmeSource, $utf8NoBom)
 }
 $configSource = Read-Utf8File "HMenuConfig.lua"
