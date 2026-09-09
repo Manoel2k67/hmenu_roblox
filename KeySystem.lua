@@ -11,10 +11,11 @@ local REPOSITORIES = {
     "https://raw.githubusercontent.com/Manoel2k67/hmenu_roblox/main/",
     "https://cdn.jsdelivr.net/gh/Manoel2k67/hmenu_roblox@main/",
 }
+local CACHE_BUST = tostring(os.time())
 local function downloadReleaseVersion()
     for _, repository in ipairs(REPOSITORIES) do
         local ok, response = pcall(function()
-            return game:HttpGet(repository .. "VERSION", true)
+            return game:HttpGet(repository .. "VERSION?cacheBust=" .. CACHE_BUST, true)
         end)
         if ok and type(response) == "string" then
             local version = response:match("^%s*(%d+%.%d+%.%d+)%s*$")
@@ -197,7 +198,8 @@ local function downloadBundle(onAttempt)
     for attempt = 1, MAX_DOWNLOAD_ATTEMPTS do
         for _, repository in ipairs(REPOSITORIES) do
             if onAttempt then onAttempt(attempt) end
-            local url = repository .. BUNDLE_PATH .. "?v=" .. RELEASE_VERSION
+            local url = repository .. BUNDLE_PATH
+                .. "?v=" .. RELEASE_VERSION .. "&cacheBust=" .. CACHE_BUST
             local requestOk, response = pcall(function()
                 return game:HttpGet(url, true)
             end)
