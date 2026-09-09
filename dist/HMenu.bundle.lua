@@ -4313,23 +4313,19 @@ function TrollRuntime:Create()
         _G.__HMENU_TROLL_IMPULSE = impulseMarker
         actionToken = actionToken + 1
         local token = actionToken
-        local savedCFrame = targetRoot.CFrame
-        local savedLinearVelocity = targetRoot.AssemblyLinearVelocity
-        local savedAngularVelocity = targetRoot.AssemblyAngularVelocity
+
         local savedAutoRotate = targetHumanoid.AutoRotate
         local restored = false
 
         local function restore()
             if restored then return end
             restored = true
-            if targetRoot and targetRoot.Parent then
-                targetRoot.AssemblyLinearVelocity = savedLinearVelocity
-                targetRoot.AssemblyAngularVelocity = savedAngularVelocity
-                targetRoot.CFrame = savedCFrame
-            end
+
+            -- Só restaura o AutoRotate do alvo (não mexe na velocidade dele)
             if targetHumanoid and targetHumanoid.Parent then
                 targetHumanoid.AutoRotate = savedAutoRotate
             end
+
             if _G.__HMENU_TROLL_IMPULSE == impulseMarker then
                 _G.__HMENU_TROLL_IMPULSE = nil
             end
@@ -4345,21 +4341,28 @@ function TrollRuntime:Create()
 
                 while not destroyed and settings.TouchFling and token == actionToken
                     and os.clock() - startedAt < 0.28 do
+
                     local currentTargetRoot = livingRoot(targetPlayer.Character)
                     local currentLocalRoot = livingRoot(localPlayer.Character)
                     if not currentTargetRoot or not currentLocalRoot then break end
 
                     local horizontal = currentTargetRoot.Position - currentLocalRoot.Position
                     horizontal = Vector3.new(horizontal.X, 0, horizontal.Z)
+
                     if horizontal.Magnitude < 0.05 then
-                        horizontal = Vector3.new(currentLocalRoot.CFrame.LookVector.X, 0,
-                            currentLocalRoot.CFrame.LookVector.Z)
+                        horizontal = Vector3.new(currentLocalRoot.CFrame.LookVector.X, 0, currentLocalRoot.CFrame.LookVector.Z)
                     end
+
                     local direction = horizontal.Magnitude > 0.05 and horizontal.Unit or Vector3.new(1, 0, 0)
 
-                    currentTargetRoot.AssemblyLinearVelocity = Vector3.new(direction.X * 9000, 12000,
-                        direction.Z * 9000)
+                    -- Impulso forte só no alvo
+                    currentTargetRoot.AssemblyLinearVelocity = Vector3.new(
+                        direction.X * 11000,
+                        14000,
+                        direction.Z * 11000
+                    )
                     currentTargetRoot.AssemblyAngularVelocity = Vector3.new(0, 100000, 0)
+
                     RunService.Heartbeat:Wait()
                 end
             end)
@@ -4373,7 +4376,9 @@ function TrollRuntime:Create()
         if destroyed or not settings.TouchFling or not part or not part.Parent then return end
         if localPlayer.Character and part:IsDescendantOf(localPlayer.Character) then return end
         local targetPlayer = playerFromPart(part)
-        if targetPlayer and targetPlayer ~= localPlayer then fling(targetPlayer) end
+        if targetPlayer and targetPlayer ~= localPlayer then
+            fling(targetPlayer)
+        end
     end
 
     local function watchPart(part)
