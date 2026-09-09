@@ -1,12 +1,12 @@
 -- HMenu bootstrap. Public entry point:
--- loadstring(game:HttpGet("https://raw.githubusercontent.com/Manoel2k67/hmenu_roblox/main/KeySystem.lua?v=1.1.2", true))()
+-- loadstring(game:HttpGet("https://raw.githubusercontent.com/Manoel2k67/hmenu_roblox/main/KeySystem.lua?v=1.1.3", true))()
 
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
-local RELEASE_VERSION = "1.1.2"
+local RELEASE_VERSION = "1.1.3"
 local BUNDLE_PATH = "dist/HMenu.bundle.lua"
 local REPOSITORIES = {
     "https://raw.githubusercontent.com/Manoel2k67/hmenu_roblox/main/",
@@ -193,8 +193,17 @@ local function downloadBundle(onAttempt)
                 local responseError, source = payloadError(response)
                 if not responseError then
                     local chunk, compileError = loadstring(source, "@HMenu/" .. BUNDLE_PATH)
-                    if chunk then return chunk, repository end
-                    lastError = "bundle inválido: " .. tostring(compileError)
+                    if chunk then
+                        local bundleOk, bundle = pcall(chunk)
+                        if bundleOk and type(bundle) == "table"
+                            and bundle.Version == RELEASE_VERSION
+                            and type(bundle.Create) == "function" then
+                            return function() return bundle end, repository
+                        end
+                        lastError = "bundle desatualizado ou inválido"
+                    else
+                        lastError = "bundle inválido: " .. tostring(compileError)
+                    end
                 else
                     lastError = responseError
                 end
