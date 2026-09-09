@@ -110,7 +110,7 @@ Config.Icons = {
     bookmark = "rbxassetid://7733692043",
     search = "rbxassetid://7734052925",
     laptop = "rbxassetid://7733965386",
-    fire = "rbxassetid://7733692043",
+    fire = "rbxassetid://7733965386",
     sparkles = "rbxassetid://7734052925",
 }
 
