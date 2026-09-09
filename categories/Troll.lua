@@ -1,13 +1,13 @@
 return {
     Id = "Troll",
     Label = "Troll",
-    Icon = "smile",
+    Icon = "fire",
     Bookmarked = false,
     RuntimeModule = "runtime/Troll.lua",
     Sections = {
         {
             Title = "Fling",
-            Icon = "target",
+            Icon = "fire",
             Controls = {
                 {
                     Kind = "Toggle",
