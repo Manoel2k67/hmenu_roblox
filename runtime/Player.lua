@@ -238,7 +238,8 @@ function PlayerRuntime:Create()
         if settings.AntiFling or settings.AntiVoid then captureSafePosition() end
         local root = rootPart()
         if not root or settings.Fly then return end
-        if settings.AntiFling then
+        local ownTrollImpulse = rawget(_G, "__HMENU_TROLL_IMPULSE") ~= nil
+        if settings.AntiFling and not ownTrollImpulse then
             local flung = root.AssemblyLinearVelocity.Magnitude > 250 or root.AssemblyAngularVelocity.Magnitude > 100
             recover(flung)
         end
