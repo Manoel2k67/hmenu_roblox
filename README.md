@@ -94,11 +94,10 @@ Sem o argumento `LuauCompiler`, as verificações de estrutura, encoding, assets
 
 Antes de publicar uma release:
 
-1. Atualize `RELEASE_VERSION` em `KeySystem.lua` e `Config.Version` em `HMenuConfig.lua` com o mesmo número.
-2. Atualize a versão das duas URLs do bootstrap neste README.
-3. Execute `Build-Bundle.ps1`.
-4. Execute `Test-Project.ps1` com `luau-compile`.
-5. Versione também `dist/HMenu.bundle.lua`.
+1. Atualize somente o arquivo `VERSION`.
+2. Execute `Build-Bundle.ps1`.
+3. Execute `Test-Project.ps1` com `luau-compile`.
+4. Versione também `dist/HMenu.bundle.lua`.
 
 O build falha se as versões divergirem ou se o bundle estiver desatualizado. Todos os textos devem permanecer em UTF-8 sem BOM.
 

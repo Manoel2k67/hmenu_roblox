@@ -6,6 +6,7 @@ param(
 $ErrorActionPreference = "Stop"
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $outputPath = Join-Path $repoRoot "dist\HMenu.bundle.lua"
+$versionPath = Join-Path $repoRoot "VERSION"
 $strictUtf8 = New-Object Text.UTF8Encoding($false, $true)
 $utf8NoBom = New-Object Text.UTF8Encoding($false)
 
@@ -17,27 +18,48 @@ function Read-Utf8File([string]$relativePath) {
     return $strictUtf8.GetString([IO.File]::ReadAllBytes($absolutePath))
 }
 
+$releaseVersion = (Read-Utf8File "VERSION").Trim()
+if ($releaseVersion -notmatch '^\d+\.\d+\.\d+$') {
+    throw "VERSION deve conter somente uma versao semantica no formato X.Y.Z."
+}
+
 $configSource = Read-Utf8File "HMenuConfig.lua"
 $keySystemSource = Read-Utf8File "KeySystem.lua"
 $readmeSource = Read-Utf8File "README.md"
-$configVersionMatch = [regex]::Match($configSource, 'Config\.Version\s*=\s*"v([^"]+)"')
-$loaderVersionMatch = [regex]::Match($keySystemSource, 'RELEASE_VERSION\s*=\s*"([^"]+)"')
-if (-not $configVersionMatch.Success -or -not $loaderVersionMatch.Success) {
-    throw "Nao foi possivel identificar as versoes em HMenuConfig.lua e KeySystem.lua."
+$expectedConfig = 'Config.Version = "v' + $releaseVersion + '"'
+$expectedLoader = 'local RELEASE_VERSION = "' + $releaseVersion + '"'
+if ($configSource -notmatch [regex]::Escape($expectedConfig)) {
+    if ($Check) { throw "HMenuConfig.lua nao esta sincronizado com VERSION. Execute o build novamente." }
+    $configSource = [regex]::Replace($configSource, 'Config\.Version\s*=\s*"v[^"]+"',
+        $expectedConfig, 1)
+    [IO.File]::WriteAllText((Join-Path $repoRoot "HMenuConfig.lua"), $configSource, $utf8NoBom)
 }
-if ($configVersionMatch.Groups[1].Value -ne $loaderVersionMatch.Groups[1].Value) {
-    throw "Versoes divergentes: HMenuConfig=$($configVersionMatch.Groups[1].Value), KeySystem=$($loaderVersionMatch.Groups[1].Value)."
+if ($keySystemSource -notmatch [regex]::Escape($expectedLoader)) {
+    if ($Check) { throw "KeySystem.lua nao esta sincronizado com VERSION. Execute o build novamente." }
+    $keySystemSource = [regex]::Replace($keySystemSource, 'local RELEASE_VERSION\s*=\s*"[^"]+"',
+        $expectedLoader, 1)
+    [IO.File]::WriteAllText((Join-Path $repoRoot "KeySystem.lua"), $keySystemSource, $utf8NoBom)
 }
-$releaseVersion = $loaderVersionMatch.Groups[1].Value
+$expectedLoaderComment = 'main/KeySystem.lua?v=' + $releaseVersion
+if ($keySystemSource -notmatch [regex]::Escape($expectedLoaderComment)) {
+    if ($Check) { throw "O exemplo de carregamento em KeySystem.lua diverge de VERSION." }
+    $keySystemSource = [regex]::Replace($keySystemSource,
+        'main/KeySystem\.lua\?v=[0-9A-Za-z._-]+',
+        $expectedLoaderComment, 1)
+    [IO.File]::WriteAllText((Join-Path $repoRoot "KeySystem.lua"), $keySystemSource, $utf8NoBom)
+}
 $readmeVersionMatches = [regex]::Matches($readmeSource, 'KeySystem\.lua\?v=([0-9A-Za-z._-]+)')
 if ($readmeVersionMatches.Count -lt 2) {
     throw "O bootstrap do README deve conter as duas fontes versionadas."
 }
-foreach ($match in $readmeVersionMatches) {
-    if ($match.Groups[1].Value -ne $releaseVersion) {
-        throw "A versao do bootstrap no README diverge da release $releaseVersion."
-    }
+if ($readmeVersionMatches | Where-Object { $_.Groups[1].Value -ne $releaseVersion }) {
+    if ($Check) { throw "A versao do bootstrap no README diverge de VERSION." }
+    $readmeSource = [regex]::Replace($readmeSource, '(KeySystem\.lua\?v=)[0-9A-Za-z._-]+',
+        ('$1' + $releaseVersion))
+    [IO.File]::WriteAllText((Join-Path $repoRoot "README.md"), $readmeSource, $utf8NoBom)
 }
+$configSource = Read-Utf8File "HMenuConfig.lua"
+$keySystemSource = Read-Utf8File "KeySystem.lua"
 
 $modulePaths = New-Object Collections.Generic.List[string]
 $modulePaths.Add("HMenuConfig.lua")
