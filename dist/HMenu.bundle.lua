@@ -1,6 +1,6 @@
 -- AUTO-GENERATED FILE. DO NOT EDIT DIRECTLY.
 -- Run tools/Build-Bundle.ps1 after changing a source module.
--- Release: 1.1.1
+-- Release: 1.1.2
 
 local __modules = {}
 
@@ -9,7 +9,7 @@ __modules["HMenuConfig.lua"] = function()
 local Config = {}
 
 Config.GuiName = "HMenu"
-Config.Version = "v1.1.1"
+Config.Version = "v1.1.2"
 Config.ToggleKey = Enum.KeyCode.RightShift
 Config.DefaultCategory = "Main"
 Config.Window = { Width = 720, Height = 520, MinScale = 0.68, Margin = 24 }
@@ -110,6 +110,8 @@ Config.Icons = {
     bookmark = "rbxassetid://7733692043",
     search = "rbxassetid://7734052925",
     laptop = "rbxassetid://7733965386",
+    fire = "rbxassetid://7733692043",
+    sparkles = "rbxassetid://7734052925",
 }
 
 Config.CategoryModules = {
@@ -4977,7 +4979,7 @@ end
 -- END runtime/Visuals.lua
 
 local Bundle = {
-    Version = "1.1.1",
+    Version = "1.1.2",
     ModuleCount = 24,
 }
 

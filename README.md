@@ -8,8 +8,8 @@ Use o bootstrap resiliente abaixo:
 
 ```lua
 local sources = {
-    "https://raw.githubusercontent.com/Manoel2k67/hmenu_roblox/main/KeySystem.lua?v=1.1.1",
-    "https://cdn.jsdelivr.net/gh/Manoel2k67/hmenu_roblox@main/KeySystem.lua?v=1.1.1",
+    "https://raw.githubusercontent.com/Manoel2k67/hmenu_roblox/main/KeySystem.lua?v=1.1.2",
+    "https://cdn.jsdelivr.net/gh/Manoel2k67/hmenu_roblox@main/KeySystem.lua?v=1.1.2",
 }
 local lastError = "falha de rede"
 for attempt = 1, 4 do

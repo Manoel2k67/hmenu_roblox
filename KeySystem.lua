@@ -1,12 +1,12 @@
 -- HMenu bootstrap. Public entry point:
--- loadstring(game:HttpGet("https://raw.githubusercontent.com/Manoel2k67/hmenu_roblox/main/KeySystem.lua?v=1.1.1", true))()
+-- loadstring(game:HttpGet("https://raw.githubusercontent.com/Manoel2k67/hmenu_roblox/main/KeySystem.lua?v=1.1.2", true))()
 
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
-local RELEASE_VERSION = "1.1.1"
+local RELEASE_VERSION = "1.1.2"
 local BUNDLE_PATH = "dist/HMenu.bundle.lua"
 local REPOSITORIES = {
     "https://raw.githubusercontent.com/Manoel2k67/hmenu_roblox/main/",
