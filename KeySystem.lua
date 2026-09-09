@@ -6,12 +6,25 @@ local CoreGui = game:GetService("CoreGui")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
-local RELEASE_VERSION = "1.1.4"
 local BUNDLE_PATH = "dist/HMenu.bundle.lua"
 local REPOSITORIES = {
     "https://raw.githubusercontent.com/Manoel2k67/hmenu_roblox/main/",
     "https://cdn.jsdelivr.net/gh/Manoel2k67/hmenu_roblox@main/",
 }
+local function downloadReleaseVersion()
+    for _, repository in ipairs(REPOSITORIES) do
+        local ok, response = pcall(function()
+            return game:HttpGet(repository .. "VERSION", true)
+        end)
+        if ok and type(response) == "string" then
+            local version = response:match("^%s*(%d+%.%d+%.%d+)%s*$")
+            if version then return version end
+        end
+    end
+    error("não foi possível baixar VERSION do HMenu", 0)
+end
+local RELEASE_VERSION = downloadReleaseVersion()
+_G.__HMENU_RELEASE_VERSION = RELEASE_VERSION
 local MAX_DOWNLOAD_ATTEMPTS = 4
 local RETRY_BASE_DELAY = 0.75
 local GUI_NAME = "HMenuKeySystem"

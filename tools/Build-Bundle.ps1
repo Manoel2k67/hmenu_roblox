@@ -26,20 +26,6 @@ if ($releaseVersion -notmatch '^\d+\.\d+\.\d+$') {
 $configSource = Read-Utf8File "HMenuConfig.lua"
 $keySystemSource = Read-Utf8File "KeySystem.lua"
 $readmeSource = Read-Utf8File "README.md"
-$expectedConfig = 'Config.Version = "v' + $releaseVersion + '"'
-$expectedLoader = 'local RELEASE_VERSION = "' + $releaseVersion + '"'
-if ($configSource -notmatch [regex]::Escape($expectedConfig)) {
-    if ($Check) { throw "HMenuConfig.lua nao esta sincronizado com VERSION. Execute o build novamente." }
-    $configSource = [regex]::Replace($configSource, 'Config\.Version\s*=\s*"v[^"]+"',
-        $expectedConfig, 1)
-    [IO.File]::WriteAllText((Join-Path $repoRoot "HMenuConfig.lua"), $configSource, $utf8NoBom)
-}
-if ($keySystemSource -notmatch [regex]::Escape($expectedLoader)) {
-    if ($Check) { throw "KeySystem.lua nao esta sincronizado com VERSION. Execute o build novamente." }
-    $keySystemSource = [regex]::Replace($keySystemSource, 'local RELEASE_VERSION\s*=\s*"[^"]+"',
-        $expectedLoader, 1)
-    [IO.File]::WriteAllText((Join-Path $repoRoot "KeySystem.lua"), $keySystemSource, $utf8NoBom)
-}
 $expectedLoaderComment = 'main/KeySystem.lua?v=' + $releaseVersion
 if ($keySystemSource -notmatch [regex]::Escape($expectedLoaderComment)) {
     if ($Check) { throw "O exemplo de carregamento em KeySystem.lua diverge de VERSION." }
