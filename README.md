@@ -106,8 +106,9 @@ O workflow `.github/workflows/validate.yml` executa essas validações automatic
 ## Chaves e segurança
 
 O `KeySystem.lua` valida a chave via `POST /api/licenses/validate`, usando o slug
-`script-murder-mistery-2`. Antes de publicar, substitua `LICENSE_API_URL` pela URL HTTPS
-pública do backend. `localhost` não pode ser acessado pelo Roblox.
+`script-murder-mistery-2`. A URL pública atual da API é
+`https://m2kscripts-backend.onrender.com/api/licenses/validate`. `localhost` não pode
+ser acessado pelo Roblox.
 
 O executor precisa oferecer uma função de requisição HTTPS POST (`syn.request`,
 `request`, `http_request` ou `http.request`). Sem ela, o menu recusa a validação.

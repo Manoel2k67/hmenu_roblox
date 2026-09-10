@@ -30,9 +30,9 @@ _G.__HMENU_RELEASE_VERSION = RELEASE_VERSION
 local MAX_DOWNLOAD_ATTEMPTS = 4
 local RETRY_BASE_DELAY = 0.75
 local GUI_NAME = "HMenuKeySystem"
-local LICENSE_API_URL = "https://api.seudominio.com/api/licenses/validate"
+local LICENSE_API_URL = "https://m2kscripts-backend.onrender.com/api/licenses/validate"
 local PRODUCT_SLUG = "script-murder-mistery-2"
-local LICENSE_API_CONFIGURED = not LICENSE_API_URL:find("seudominio.com", 1, true)
+local LICENSE_API_CONFIGURED = LICENSE_API_URL:match("^https://") ~= nil
 local GET_KEY_URL = nil -- Configure an HTTPS community/key URL before production.
 local HAS_KEY_URL = type(GET_KEY_URL) == "string" and string.match(GET_KEY_URL, "^https://") ~= nil
 
