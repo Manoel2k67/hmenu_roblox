@@ -5,6 +5,7 @@ local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
+local HttpService = game:GetService("HttpService")
 
 local BUNDLE_PATH = "dist/HMenu.bundle.lua"
 local REPOSITORIES = {
@@ -29,8 +30,9 @@ _G.__HMENU_RELEASE_VERSION = RELEASE_VERSION
 local MAX_DOWNLOAD_ATTEMPTS = 4
 local RETRY_BASE_DELAY = 0.75
 local GUI_NAME = "HMenuKeySystem"
-local ACCEPT_ANY_NON_EMPTY_KEY = true -- Temporary mock validation.
-local VALID_KEYS = { "HMENU-DEMO" }
+local LICENSE_API_URL = "https://api.seudominio.com/api/licenses/validate"
+local PRODUCT_SLUG = "script-murder-mistery-2"
+local LICENSE_API_CONFIGURED = not LICENSE_API_URL:find("seudominio.com", 1, true)
 local GET_KEY_URL = nil -- Configure an HTTPS community/key URL before production.
 local HAS_KEY_URL = type(GET_KEY_URL) == "string" and string.match(GET_KEY_URL, "^https://") ~= nil
 
@@ -127,7 +129,7 @@ new("TextLabel", {
 local input = new("TextBox", {
     Size = UDim2.new(1, -44, 0, 42), Position = UDim2.fromOffset(22, 136),
     BackgroundColor3 = Color3.fromRGB(19, 31, 55), BackgroundTransparency = 0.12,
-    BorderSizePixel = 0, ClearTextOnFocus = false, PlaceholderText = "Digite qualquer chave...",
+    BorderSizePixel = 0, ClearTextOnFocus = false,     PlaceholderText = "Cole a chave recebida no site...",
     PlaceholderColor3 = Color3.fromRGB(115, 133, 170), Text = "",
     TextColor3 = Color3.fromRGB(235, 241, 255), Font = Enum.Font.Gotham,
     TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left,
@@ -152,7 +154,7 @@ local getKey = new("TextButton", {
 local status = new("TextLabel", {
     Size = HAS_KEY_URL and UDim2.new(1, -190, 0, 25) or UDim2.new(1, -44, 0, 25),
     Position = HAS_KEY_URL and UDim2.new(0, 169, 0, 239) or UDim2.fromOffset(22, 239),
-    BackgroundTransparency = 1, Text = "Qualquer chave funciona no modo demo",
+    BackgroundTransparency = 1, Text = "A chave será validada online",
     TextColor3 = Color3.fromRGB(128, 145, 178), Font = Enum.Font.Gotham,
     TextSize = 10, TextXAlignment = HAS_KEY_URL and Enum.TextXAlignment.Right or Enum.TextXAlignment.Center,
 }, window)
@@ -160,12 +162,63 @@ local status = new("TextLabel", {
 local busy = false
 local function validKey(value)
     value = value:match("^%s*(.-)%s*$")
-    if value == "" then return false end
-    if ACCEPT_ANY_NON_EMPTY_KEY then return true end
-    for _, allowed in ipairs(VALID_KEYS) do
-        if value == allowed then return true end
+    return value ~= "" and #value >= 20
+end
+
+local function getHttpRequest()
+    if type(syn) == "table" and type(syn.request) == "function" then return syn.request end
+    if type(request) == "function" then return request end
+    if type(http_request) == "function" then return http_request end
+    if type(http) == "table" and type(http.request) == "function" then return http.request end
+    return nil
+end
+
+local function validateLicense(key)
+    if not LICENSE_API_CONFIGURED then
+        return false, "configure a URL pública da API"
     end
-    return false
+
+    local requestFunction = getHttpRequest()
+    if not requestFunction then
+        return false, "executor sem suporte a requisições HTTPS POST"
+    end
+
+    local body = HttpService:JSONEncode({
+        key = key:match("^%s*(.-)%s*$"),
+        productSlug = PRODUCT_SLUG,
+        deviceId = "roblox-user-" .. tostring(Players.LocalPlayer.UserId),
+    })
+    local ok, response = pcall(requestFunction, {
+        Url = LICENSE_API_URL,
+        Method = "POST",
+        Headers = { ["Content-Type"] = "application/json" },
+        Body = body,
+    })
+    if not ok or type(response) ~= "table" then
+        return false, "não foi possível conectar à API"
+    end
+
+    local statusCode = tonumber(response.StatusCode or response.Status)
+    if statusCode and (statusCode < 200 or statusCode >= 300) then
+        return false, "API recusou a validação (" .. tostring(statusCode) .. ")"
+    end
+
+    local responseBody = response.Body or response.body
+    local decodedOk, result = pcall(HttpService.JSONDecode, HttpService, responseBody or "")
+    if not decodedOk or type(result) ~= "table" then
+        return false, "resposta inválida da API"
+    end
+    if result.valid ~= true then
+        local reasons = {
+            invalid_request = "dados inválidos",
+            invalid_key = "chave inválida",
+            disabled = "licença desativada",
+            expired = "licença expirada",
+            device_mismatch = "chave vinculada a outro usuário",
+        }
+        return false, reasons[result.reason] or "chave não autorizada"
+    end
+    return true
 end
 
 local function payloadError(source)
@@ -274,7 +327,14 @@ local function openMenu()
     end
     busy = true
     submit.Text = "Carregando..."
-    setStatus("Preparando download...", Color3.fromRGB(105, 221, 160))
+    setStatus("Validando licença...", Color3.fromRGB(105, 221, 160))
+    local licenseOk, licenseError = validateLicense(input.Text)
+    if not licenseOk then
+        submit.Text, busy = "Validar e abrir", false
+        setStatus(licenseError, Color3.fromRGB(255, 177, 98))
+        return
+    end
+    setStatus("Licença aprovada. Preparando download...", Color3.fromRGB(105, 221, 160))
     local cleanupBeforeAttempt = rawget(_G, "__HMENU_CLEANUP")
     local ok, result = pcall(function()
         local chunk = downloadBundle(function()
@@ -327,4 +387,4 @@ end)
 task.defer(function()
     if not destroyed and input.Parent then input:CaptureFocus() end
 end)
-print("[HMenu] KeySystem v" .. RELEASE_VERSION .. " pronto (validação demo ativa)")
+print("[HMenu] KeySystem v" .. RELEASE_VERSION .. " pronto (validação online ativa)")

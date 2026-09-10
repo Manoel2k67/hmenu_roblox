@@ -34,7 +34,7 @@ O carregador baixa apenas `dist/HMenu.bundle.lua`. Ele valida a resposta, rejeit
 
 ## Controles
 
-- Digite qualquer chave não vazia e clique em **Validar e abrir** ou pressione Enter.
+- Digite a chave recebida na compra e clique em **Validar e abrir** ou pressione Enter.
 - Use **RightShift** para ocultar e mostrar o menu.
 - Arraste a barra superior para mover a janela.
 - Os botões `-` e `X` ocultam o menu; RightShift o mostra novamente.
@@ -105,7 +105,12 @@ O workflow `.github/workflows/validate.yml` executa essas validações automatic
 
 ## Chaves e segurança
 
-O modo atual aceita qualquer chave não vazia porque `ACCEPT_ANY_NON_EMPTY_KEY` está como `true` em `KeySystem.lua`. Isso é adequado apenas para demonstração.
+O `KeySystem.lua` valida a chave via `POST /api/licenses/validate`, usando o slug
+`script-murder-mistery-2`. Antes de publicar, substitua `LICENSE_API_URL` pela URL HTTPS
+pública do backend. `localhost` não pode ser acessado pelo Roblox.
+
+O executor precisa oferecer uma função de requisição HTTPS POST (`syn.request`,
+`request`, `http_request` ou `http.request`). Sem ela, o menu recusa a validação.
 
 Defina `GET_KEY_URL` com uma URL HTTPS válida para exibir o botão **Obter chave / comunidade**. Enquanto esse valor estiver vazio, o botão permanece oculto e nenhum link fictício é mostrado ao usuário.
 
