@@ -4,7 +4,17 @@ return {
         { Title = "About", Icon = "info", Controls = {
             { Kind = "Paragraph", Label = "HMenu v1.0", Description = "Interface modular criada para manutenção simples e expansão por categorias." },
             { Kind = "Paragraph", Label = "Desenvolvimento", Description = "Manoel2k67 / HMenu" },
-            { Kind = "Button", Id = "copy_community", Label = "Community", ButtonText = "Copiar link" },
+            {
+                Kind = "Button",
+                Id = "copy_community",
+                Label = "Community",
+                ButtonText = "Copiar link",
+                Callback = function()
+                    if type(setclipboard) == "function" then
+                        setclipboard("https://m2kscripts-frontend.vercel.app/")
+                    end
+                end,
+            },
         }},
     },
 }

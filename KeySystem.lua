@@ -33,7 +33,7 @@ local GUI_NAME = "HMenuKeySystem"
 local LICENSE_API_URL = "https://m2kscripts-backend.onrender.com/api/licenses/validate"
 local PRODUCT_SLUG = "script-murder-mistery-2"
 local LICENSE_API_CONFIGURED = LICENSE_API_URL:match("^https://") ~= nil
-local GET_KEY_URL = nil -- Configure an HTTPS community/key URL before production.
+local GET_KEY_URL = "https://m2kscripts-frontend.vercel.app/"
 local HAS_KEY_URL = type(GET_KEY_URL) == "string" and string.match(GET_KEY_URL, "^https://") ~= nil
 
 if type(_G.__HMENU_KEY_CLEANUP) == "function" then
