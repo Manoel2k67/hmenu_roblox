@@ -21,6 +21,7 @@ function TrollRuntime:Create()
     local actionToken = 0
     local flinging = false
     local activeRestore
+    local ownImpulseActive = false
 
     local settings = {
         SelectedPlayer = "Select a player",
@@ -114,11 +115,11 @@ function TrollRuntime:Create()
             return false
         end
 
-        local duration = 0.65
+        local duration = 0.8
         local cooldown = tonumber(TARGET_DEBOUNCE) or 0.8
-        local maxSpeed = 85
-        local maxTargetSpeed = 120
-        local maxDistance = 18
+        local maxSpeed = 240
+        local maxTargetSpeed = 350
+        local maxDistance = 24
 
         local originalPivot = character:GetPivot()
         local originalRoot = root.CFrame
@@ -148,6 +149,8 @@ function TrollRuntime:Create()
         local watchdog
 
         flinging = true
+        ownImpulseActive = true
+        _G.__HMENU_TROLL_IMPULSE = true
         targetDebounce[targetPlayer] = now + cooldown
 
         local function sameCharacter()
@@ -208,6 +211,10 @@ function TrollRuntime:Create()
 
             activeRestore = nil
             flinging = false
+            if ownImpulseActive then
+                ownImpulseActive = false
+                _G.__HMENU_TROLL_IMPULSE = nil
+            end
 
             if moved then
                 task.spawn(function()
@@ -297,7 +304,7 @@ function TrollRuntime:Create()
                     end
 
                     local predicted = targetRoot.Position + prediction
-                    local position = predicted + side * 1.15
+                    local position = predicted + side * 1.05
                         + Vector3.new(0, 0.35, 0)
 
                     if position.Y < Workspace.FallenPartsDestroyHeight + 60
@@ -312,14 +319,14 @@ function TrollRuntime:Create()
                     character:PivotTo(desiredRoot * pivotToRoot:Inverse())
 
                     local velocity = targetVelocity
-                        - side * 50
-                        + Vector3.new(0, 8, 0)
+                        - side * 180
+                        + Vector3.new(0, 35, 0)
                     if velocity.Magnitude > maxSpeed then
                         velocity = velocity.Unit * maxSpeed
                     end
 
                     root.AssemblyLinearVelocity = velocity
-                    root.AssemblyAngularVelocity = Vector3.new(0, 80, 0)
+                    root.AssemblyAngularVelocity = Vector3.new(0, 2500, 0)
                 end
             end)
 
@@ -455,6 +462,10 @@ function TrollRuntime:Create()
         disconnectAll(touchConnections)
         disconnectAll(connections)
         targetDebounce = setmetatable({}, { __mode = "k" })
+        if ownImpulseActive then
+            ownImpulseActive = false
+            _G.__HMENU_TROLL_IMPULSE = nil
+        end
 
         if _G.__HMENU_TROLL_CLEANUP == cleanupFunction then
             _G.__HMENU_TROLL_CLEANUP = nil
