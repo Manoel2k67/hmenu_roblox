@@ -1,349 +1,240 @@
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local Workspace = game:GetService("Workspace")
-
-local TrollRuntime = {}
-
-local FLING_DURATION = 1.4
-local TARGET_DEBOUNCE = 0.8
-local PREDICTION_TIME = 0.05
-local FLING_OFFSETS = {
-	CFrame.new(0, 1.2, 0),
-	CFrame.new(0, -1.2, 0),
-	CFrame.new(1.8, 0.8, -1.8),
-	CFrame.new(-1.8, -0.8, 1.8),
-	CFrame.new(0, 0, 2.2),
-	CFrame.new(0, 0, -2.2),
-}
-
-function TrollRuntime:Create()
-	if type(_G.__HMENU_TROLL_CLEANUP) == "function" then
-		pcall(_G.__HMENU_TROLL_CLEANUP)
+local function fling(targetPlayer, requireTouchEnabled)
+	if destroyed or flinging then
+		return false
 	end
 
-	local runtime = {}
-	local localPlayer = Players.LocalPlayer
-	local connections = {}
-	local touchConnections = {}
-	local targetDebounce = {}
-	local destroyed = false
-	local cleanupFunction
-	local actionToken = 0
-	local flinging = false
-	local activeRestore
-
-	local settings = {
-		SelectedPlayer = "Select a player",
-		FlingSelected = false,
-		TouchFling = false,
-	}
-
-	local function connect(bucket, signal, callback)
-		local connection = signal:Connect(callback)
-		table.insert(bucket, connection)
-		return connection
+	if not targetPlayer
+		or targetPlayer == localPlayer
+		or targetPlayer.Parent ~= Players then
+		return false
 	end
 
-	local function disconnectAll(bucket)
-		for index = #bucket, 1, -1 do
-			pcall(function()
-				bucket[index]:Disconnect()
-			end)
-			table.remove(bucket, index)
+	if requireTouchEnabled and not settings.TouchFling then
+		return false
+	end
+
+	local now = os.clock()
+	if (targetDebounce[targetPlayer] or 0) > now then
+		return false
+	end
+
+	local targetCharacter, targetRoot, targetHumanoid =
+		livingCharacter(targetPlayer)
+
+	local localCharacter, localRoot, localHumanoid =
+		livingCharacter(localPlayer)
+
+	if not targetCharacter or not localCharacter then
+		return false
+	end
+
+	if localRoot.Anchored or localHumanoid.SeatPart then
+		return false
+	end
+
+	-- Valores conservadores para reduzir a perda de controle.
+	-- Aumentar estes valores não garante lançar o alvo.
+	local MAX_LINEAR_SPEED = 85
+	local ANGULAR_SPEED = 120
+	local MAX_SEPARATION = 35
+	local MAX_TARGET_SPEED = 180
+
+	local originalPivot = localCharacter:GetPivot()
+	local originalAutoRotate = localHumanoid.AutoRotate
+
+	local parts = {}
+	for _, instance in ipairs(localCharacter:GetDescendants()) do
+		if instance:IsA("BasePart") then
+			table.insert(parts, instance)
 		end
 	end
 
-	local function livingCharacter(player)
-		local character = player and player.Character
-		if not character then
-			return nil
+	actionToken += 1
+	local token = actionToken
+	local restored = false
+	local startedAt = os.clock()
+	local step = 0
+
+	flinging = true
+	targetDebounce[targetPlayer] = now + TARGET_DEBOUNCE
+
+	local function zeroVelocity()
+		for _, part in ipairs(parts) do
+			if part.Parent then
+				pcall(function()
+					part.AssemblyLinearVelocity = Vector3.zero
+					part.AssemblyAngularVelocity = Vector3.zero
+				end)
+			end
 		end
-		local humanoid = character:FindFirstChildOfClass("Humanoid")
-		local root = character:FindFirstChild("HumanoidRootPart") or (humanoid and humanoid.RootPart)
-		if not humanoid or humanoid.Health <= 0 or not root or not root:IsA("BasePart") then
-			return nil
-		end
-		return character, root, humanoid
 	end
 
-	local function playerFromPart(part)
-		local ancestor = part
-		while ancestor do
-			if ancestor:IsA("Model") then
-				local player = Players:GetPlayerFromCharacter(ancestor)
-				if player then
-					return player
+	local function restore()
+		if restored then
+			return
+		end
+		restored = true
+
+		-- Uma tarefa antiga não deve restaurar sobre outra ação.
+		if activeRestore ~= restore then
+			return
+		end
+
+		zeroVelocity()
+
+		pcall(function()
+			-- Nunca teletransportar o personagem novo após respawn.
+			if localPlayer.Character == localCharacter
+				and localCharacter.Parent
+				and localHumanoid.Health > 0 then
+				localCharacter:PivotTo(originalPivot)
+			end
+		end)
+
+		pcall(function()
+			if localHumanoid.Parent then
+				localHumanoid.AutoRotate = originalAutoRotate
+
+				if localPlayer.Character == localCharacter
+					and localHumanoid.Health > 0 then
+					localHumanoid:ChangeState(
+						Enum.HumanoidStateType.GettingUp
+					)
 				end
 			end
-			ancestor = ancestor.Parent
+		end)
+
+		zeroVelocity()
+
+		if targetPlayer.Parent == Players then
+			targetDebounce[targetPlayer] =
+				os.clock() + TARGET_DEBOUNCE
 		end
-		return nil
+
+		activeRestore = nil
+		flinging = false
 	end
 
-	local function selectedPlayer()
-		local name = settings.SelectedPlayer
-		if type(name) ~= "string" or name == "Select a player" then
-			return nil
-		end
-		return Players:FindFirstChild(name)
-	end
+	activeRestore = restore
 
-	local function fling(targetPlayer, requireTouchEnabled)
-		if destroyed or flinging or not targetPlayer or targetPlayer == localPlayer then
+	local function valid()
+		if destroyed or restored or token ~= actionToken then
 			return false
 		end
+
 		if requireTouchEnabled and not settings.TouchFling then
 			return false
 		end
 
-		local now = os.clock()
-		if (targetDebounce[targetPlayer] or 0) > now then
+		if os.clock() - startedAt >= FLING_DURATION then
 			return false
 		end
 
-		local targetCharacter, targetRoot, targetHumanoid = livingCharacter(targetPlayer)
-		local localCharacter, localRoot, localHumanoid = livingCharacter(localPlayer)
-		if not targetCharacter or not targetRoot or not targetHumanoid
-			or not localCharacter or not localRoot or not localHumanoid then
+		if targetPlayer.Parent ~= Players then
 			return false
 		end
 
-		targetDebounce[targetPlayer] = now + TARGET_DEBOUNCE
-		flinging = true
-		actionToken = actionToken + 1
-		local token = actionToken
+		local character, root, humanoid =
+			livingCharacter(localPlayer)
 
-		local originalPivot = localCharacter:GetPivot()
-		local originalAutoRotate = localHumanoid.AutoRotate
-		local camera = Workspace.CurrentCamera
-		local originalCameraSubject = camera and camera.CameraSubject
-		local restored = false
+		local target, rootTarget, humanoidTarget =
+			livingCharacter(targetPlayer)
 
-		local function restore()
-			if restored then
+		return character == localCharacter
+			and root == localRoot
+			and humanoid == localHumanoid
+			and target == targetCharacter
+			and rootTarget == targetRoot
+			and humanoidTarget == targetHumanoid
+			and not localRoot.Anchored
+			and not targetRoot.Anchored
+			and not localHumanoid.SeatPart
+	end
+
+	task.spawn(function()
+		local ok, err = pcall(function()
+			-- Pode ter sido cancelado antes de task.spawn executar.
+			if not valid() then
 				return
 			end
-			restored = true
 
-			pcall(function()
-				if localCharacter and localCharacter.Parent then
-					for _, part in ipairs(localCharacter:GetDescendants()) do
-						if part:IsA("BasePart") then
-							part.AssemblyLinearVelocity = Vector3.zero
-							part.AssemblyAngularVelocity = Vector3.zero
-						end
-					end
-					localCharacter:PivotTo(originalPivot + Vector3.new(0, 1, 0))
+			localHumanoid.AutoRotate = false
+
+			while valid() do
+				RunService.PreSimulation:Wait()
+
+				-- Revalidar depois de qualquer espera.
+				if not valid() then
+					break
 				end
-			end)
 
-			pcall(function()
-				if localHumanoid and localHumanoid.Parent then
-					localHumanoid.AutoRotate = originalAutoRotate
-					localHumanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+				local targetVelocity =
+					targetRoot.AssemblyLinearVelocity
+
+				if targetVelocity.Magnitude > MAX_TARGET_SPEED then
+					break
 				end
-			end)
 
-			pcall(function()
-				if camera and camera.Parent then
-					camera.CameraSubject = originalCameraSubject or localHumanoid
+				if localRoot.Position.Y
+					< Workspace.FallenPartsDestroyHeight + 25 then
+					break
 				end
-			end)
 
-			if activeRestore == restore then
-				activeRestore = nil
-			end
-			flinging = false
-		end
-		activeRestore = restore
-
-		task.spawn(function()
-			local ok, err = pcall(function()
-				localHumanoid.AutoRotate = false
-				pcall(function()
-					if camera then
-						camera.CameraSubject = targetHumanoid
-					end
-				end)
-
-				local startedAt = os.clock()
-				local angle = 0
-
-				while not destroyed and token == actionToken and (os.clock() - startedAt) < FLING_DURATION do
-					if requireTouchEnabled and not settings.TouchFling then
-						break
-					end
-
-					local currentTargetCharacter, currentTargetRoot, currentTargetHumanoid = livingCharacter(targetPlayer)
-					local currentLocalCharacter, currentLocalRoot, currentLocalHumanoid = livingCharacter(localPlayer)
-
-					if not currentTargetCharacter or not currentTargetRoot or not currentTargetHumanoid
-						or not currentLocalCharacter or not currentLocalRoot or not currentLocalHumanoid
-						or currentTargetCharacter ~= targetCharacter
-						or currentLocalHumanoid.Health <= 0 then
-						break
-					end
-
-					if currentTargetRoot.AssemblyLinearVelocity.Magnitude > 400 then
-						break
-					end
-
-					angle += 120
-
-					local predicted = currentTargetRoot.Position
-						+ currentTargetRoot.AssemblyLinearVelocity * PREDICTION_TIME
-
-					for _, offset in ipairs(FLING_OFFSETS) do
-						if destroyed or token ~= actionToken then
-							break
-						end
-
-						currentLocalCharacter:PivotTo(
-							CFrame.new(predicted) * offset * CFrame.Angles(math.rad(angle), math.rad(angle * 0.6), 0)
-						)
-
-						currentLocalRoot.AssemblyLinearVelocity = Vector3.new(9e7, 9e8, 9e7)
-						currentLocalRoot.AssemblyAngularVelocity = Vector3.new(9e8, 9e8, 9e8)
-
-						RunService.Heartbeat:Wait()
-					end
+				-- Ignorar distância inicial: o alvo pode estar longe.
+				if step > 0
+					and (localRoot.Position - targetRoot.Position).Magnitude
+						> MAX_SEPARATION then
+					break
 				end
-			end)
 
-			restore()
-			if not ok then
-				warn("[HMenu] Fling error:", err)
+				step += 1
+
+				local predicted = targetRoot.Position
+					+ targetVelocity * PREDICTION_TIME
+
+				-- Evitar offsets abaixo do piso.
+				local side = step % 2 == 0 and 1 or -1
+				local position = predicted
+					+ Vector3.new(side * 1.5, 0.5, 0)
+
+				local towardTarget = predicted - position
+				local direction = towardTarget.Magnitude > 0.001
+					and towardTarget.Unit
+					or Vector3.new(1, 0, 0)
+
+				zeroVelocity()
+
+				-- Posicionar a raiz considerando o pivot real do modelo.
+				local pivotToRoot =
+					localCharacter:GetPivot():ToObjectSpace(localRoot.CFrame)
+
+				local desiredRoot = CFrame.new(position)
+					* originalPivot.Rotation
+
+				localCharacter:PivotTo(
+					desiredRoot * pivotToRoot:Inverse()
+				)
+
+				local velocity = targetVelocity
+					+ direction * 55
+					+ Vector3.new(0, 12, 0)
+
+				if velocity.Magnitude > MAX_LINEAR_SPEED then
+					velocity = velocity.Unit * MAX_LINEAR_SPEED
+				end
+
+				localRoot.AssemblyLinearVelocity = velocity
+				localRoot.AssemblyAngularVelocity =
+					Vector3.new(0, ANGULAR_SPEED * side, 0)
 			end
 		end)
 
-		return true
-	end
+		restore()
 
-	local function onTouched(part)
-		if destroyed or not settings.TouchFling or not part or not part.Parent then
-			return
-		end
-		if localPlayer.Character and part:IsDescendantOf(localPlayer.Character) then
-			return
-		end
-		local targetPlayer = playerFromPart(part)
-		if targetPlayer and targetPlayer ~= localPlayer then
-			fling(targetPlayer, true)
-		end
-	end
-
-	local function watchPart(part)
-		if part:IsA("BasePart") then
-			connect(touchConnections, part.Touched, onTouched)
-		end
-	end
-
-	local function bindCharacter(character)
-		disconnectAll(touchConnections)
-		if not settings.TouchFling or not character then
-			return
-		end
-		for _, descendant in ipairs(character:GetDescendants()) do
-			watchPart(descendant)
-		end
-		connect(touchConnections, character.DescendantAdded, watchPart)
-	end
-
-	connect(connections, localPlayer.CharacterAdded, function(character)
-		actionToken = actionToken + 1
-		if activeRestore then
-			activeRestore()
-		end
-		task.defer(function()
-			if not destroyed and settings.TouchFling and character == localPlayer.Character then
-				bindCharacter(character)
-			end
-		end)
-	end)
-
-	connect(connections, Players.PlayerRemoving, function(player)
-		targetDebounce[player] = nil
-		if player == selectedPlayer() then
-			settings.SelectedPlayer = "Select a player"
+		if not ok then
+			warn("[HMenu] Fling error:", err)
 		end
 	end)
 
-	function runtime:GetOptions(source)
-		if source ~= "Players" then
-			return { "None" }
-		end
-		local names = {}
-		for _, player in ipairs(Players:GetPlayers()) do
-			if player ~= localPlayer then
-				table.insert(names, player.Name)
-			end
-		end
-		table.sort(names, function(a, b)
-			return string.lower(a) < string.lower(b)
-		end)
-		if #names == 0 then
-			return { "No players" }
-		end
-		return names
-	end
-
-	function runtime:Set(name, value)
-		if destroyed or settings[name] == nil then
-			return
-		end
-
-		if name == "SelectedPlayer" then
-			settings.SelectedPlayer = tostring(value)
-			return
-		elseif name == "FlingSelected" then
-			settings.FlingSelected = false
-			if value == true then
-				local target = selectedPlayer()
-				if target then
-					fling(target, false)
-				else
-					warn("[HMenu] Select a valid player before using Fling Target.")
-				end
-			end
-			return
-		end
-
-		settings.TouchFling = value == true
-		actionToken = actionToken + 1
-		if activeRestore then
-			activeRestore()
-		end
-		if settings.TouchFling then
-			bindCharacter(localPlayer.Character)
-		else
-			disconnectAll(touchConnections)
-			targetDebounce = {}
-		end
-	end
-
-	function runtime:Destroy()
-		if destroyed then
-			return
-		end
-		destroyed = true
-		settings.TouchFling = false
-		actionToken = actionToken + 1
-		if activeRestore then
-			activeRestore()
-		end
-		disconnectAll(touchConnections)
-		disconnectAll(connections)
-		targetDebounce = {}
-		if _G.__HMENU_TROLL_CLEANUP == cleanupFunction then
-			_G.__HMENU_TROLL_CLEANUP = nil
-		end
-	end
-
-	cleanupFunction = function()
-		runtime:Destroy()
-	end
-	_G.__HMENU_TROLL_CLEANUP = cleanupFunction
-	return runtime
+	return true
 end
-
-return TrollRuntime
