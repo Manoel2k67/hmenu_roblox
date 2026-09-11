@@ -1321,11 +1321,13 @@ end
 
 -- BEGIN categories/Credits.lua
 __modules["categories/Credits.lua"] = function()
+local releaseVersion = tostring(rawget(_G, "__HMENU_RELEASE_VERSION") or "unknown")
+
 return {
     Id = "Credits", Label = "Credits", Icon = "info", Bookmarked = false,
     Sections = {
         { Title = "About", Icon = "info", Controls = {
-            { Kind = "Paragraph", Label = "HMenu v1.0", Description = "Interface modular criada para manutenção simples e expansão por categorias." },
+            { Kind = "Paragraph", Label = "HMenu v" .. releaseVersion, Description = "Interface modular criada para manutenção simples e expansão por categorias." },
             { Kind = "Paragraph", Label = "Desenvolvimento", Description = "Manoel2k67 / HMenu" },
             {
                 Kind = "Button",
