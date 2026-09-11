@@ -2217,12 +2217,18 @@ function Combat:Create(options)
         if not gun then return nil end
         local knifeLocal = gun:FindFirstChild("KnifeLocal")
         local createBeam = knifeLocal and knifeLocal:FindFirstChild("CreateBeam", true)
-        local direct = createBeam and createBeam:FindFirstChild("RemoteFunction", true)
-        if direct and direct:IsA("RemoteFunction") then
-            return direct
+        if createBeam then
+            local named = createBeam:FindFirstChild("RemoteFunction", true)
+                or createBeam:FindFirstChild("RemoteEvent", true)
+            if named and (named:IsA("RemoteFunction") or named:IsA("RemoteEvent")) then
+                return named
+            end
+            local anyRemote = createBeam:FindFirstChildWhichIsA("RemoteFunction", true)
+                or createBeam:FindFirstChildWhichIsA("RemoteEvent", true)
+            if anyRemote then return anyRemote end
         end
         for _, descendant in ipairs(gun:GetDescendants()) do
-            if descendant:IsA("RemoteFunction") and descendant.Name == "RemoteFunction" then
+            if descendant:IsA("RemoteFunction") or descendant:IsA("RemoteEvent") then
                 local node = descendant.Parent
                 for _ = 1, 8 do
                     if not node then break end
@@ -2269,12 +2275,16 @@ function Combat:Create(options)
             return false
         end
         local ok, response = pcall(function()
-            return remote:InvokeServer(1, position, "AH2")
+            if remote:IsA("RemoteFunction") then
+                return remote:InvokeServer(1, position, "AH2")
+            end
+            remote:FireServer(1, position, "AH2")
+            return true
         end)
         shootBusy = false
         if showError then
             if ok then
-                notify("Tiro direto enviado para " .. player.Name .. ".", true)
+                notify("Tiro enviado via " .. remote.ClassName .. " para " .. player.Name .. ".", true)
             else
                 notify("A Gun recusou o disparo: " .. tostring(response), false)
             end
@@ -2293,7 +2303,10 @@ function Combat:Create(options)
     end
 
     local function remoteLooksLikeGunShot(remote)
-        if typeof(remote) ~= "Instance" or not remote:IsA("RemoteFunction") then return false end
+        if typeof(remote) ~= "Instance"
+            or (not remote:IsA("RemoteFunction") and not remote:IsA("RemoteEvent")) then
+            return false
+        end
 
         -- Prefer comparing against the remote discovered from the Gun the player
         -- actually owns. Some MM2 versions add wrappers between CreateBeam and the
@@ -2331,7 +2344,7 @@ function Combat:Create(options)
             oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
                 local method = getnamecallmethod()
                 local handler = state.Handler
-                if handler and not state.Busy and method == "InvokeServer" then
+                if handler and not state.Busy and (method == "InvokeServer" or method == "FireServer") then
                     state.Busy = true
                     local handledOk, handled, packed = pcall(handler, self, ...)
                     state.Busy = false
@@ -2358,7 +2371,7 @@ function Combat:Create(options)
         end
         local args = table.pack(...)
         local hasMM2Signature = typeof(remote) == "Instance"
-            and remote:IsA("RemoteFunction")
+            and (remote:IsA("RemoteFunction") or remote:IsA("RemoteEvent"))
             and args[1] == 1
             and args[3] == "AH2"
             and toolIn(localPlayer, "Gun") ~= nil
