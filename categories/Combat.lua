@@ -24,8 +24,8 @@ return {
             Title = "Sheriff",
             Icon = "target",
             Controls = {
-                { Kind = "Toggle", Setting = "SheriffPerfectShots", Id = "sheriff_perfect_shots", Label = "Perfect Shots", Description = "Any manual Gun shot also sends a guaranteed shot to the Murderer.", Default = false },
-                { Kind = "Button", Setting = "SheriffShootMurderer", Id = "sheriff_shoot_murderer", Label = "Shoot Murderer", Description = "Equips the Gun and fires directly at the current Murderer.", ButtonText = "Shoot" },
+                { Kind = "Button", Setting = "SheriffShootMurderer", Id = "sheriff_shoot_murderer", Label = "Atirar no Murderer", Description = "Equipa a Gun e envia um tiro diretamente para o Murderer detectado.", ButtonText = "Atirar" },
+                { Kind = "Toggle", Setting = "SheriffPerfectShots", Id = "sheriff_perfect_shots", Label = "Perfect Shots (experimental)", Description = "Tenta redirecionar tiros manuais; a compatibilidade depende do executor.", Default = false },
                 { Kind = "Toggle", Setting = "SheriffAutoShootMurderer", Id = "sheriff_auto_shoot", Label = "Auto Shoot Murderer", Description = "When the Murderer is visible, pulls the Gun from Backpack and fires automatically.", Default = false },
                 { Kind = "Slider", Setting = "SheriffShootCooldown", Id = "sheriff_shoot_cooldown", Label = "Auto Shoot Cooldown", Min = 0.4, Max = 2, Default = 1.1, Step = 0.1 },
                 { Kind = "Dropdown", Setting = "SheriffTargetPart", Id = "sheriff_target_part", Label = "Target Part", Options = { "HumanoidRootPart", "Head", "UpperTorso" }, Default = "HumanoidRootPart" },

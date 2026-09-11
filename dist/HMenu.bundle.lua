@@ -1289,8 +1289,8 @@ return {
             Title = "Sheriff",
             Icon = "target",
             Controls = {
-                { Kind = "Toggle", Setting = "SheriffPerfectShots", Id = "sheriff_perfect_shots", Label = "Perfect Shots", Description = "Any manual Gun shot also sends a guaranteed shot to the Murderer.", Default = false },
-                { Kind = "Button", Setting = "SheriffShootMurderer", Id = "sheriff_shoot_murderer", Label = "Shoot Murderer", Description = "Equips the Gun and fires directly at the current Murderer.", ButtonText = "Shoot" },
+                { Kind = "Button", Setting = "SheriffShootMurderer", Id = "sheriff_shoot_murderer", Label = "Atirar no Murderer", Description = "Equipa a Gun e envia um tiro diretamente para o Murderer detectado.", ButtonText = "Atirar" },
+                { Kind = "Toggle", Setting = "SheriffPerfectShots", Id = "sheriff_perfect_shots", Label = "Perfect Shots (experimental)", Description = "Tenta redirecionar tiros manuais; a compatibilidade depende do executor.", Default = false },
                 { Kind = "Toggle", Setting = "SheriffAutoShootMurderer", Id = "sheriff_auto_shoot", Label = "Auto Shoot Murderer", Description = "When the Murderer is visible, pulls the Gun from Backpack and fires automatically.", Default = false },
                 { Kind = "Slider", Setting = "SheriffShootCooldown", Id = "sheriff_shoot_cooldown", Label = "Auto Shoot Cooldown", Min = 0.4, Max = 2, Default = 1.1, Step = 0.1 },
                 { Kind = "Dropdown", Setting = "SheriffTargetPart", Id = "sheriff_target_part", Label = "Target Part", Options = { "HumanoidRootPart", "Head", "UpperTorso" }, Default = "HumanoidRootPart" },
@@ -2242,6 +2242,25 @@ function Combat:Create(options)
             shootBusy = false
             return false
         end
+
+        -- The server ignores some shots sent in the same frame in which the Gun
+        -- leaves the Backpack. Wait briefly and resolve the equipped instance again.
+        local currentCharacter = character()
+        if currentCharacter and gun.Parent ~= currentCharacter then
+            local equipDeadline = os.clock() + 1
+            repeat
+                task.wait()
+                gun = currentCharacter:FindFirstChild("Gun") or gun
+            until gun.Parent == currentCharacter or os.clock() >= equipDeadline
+        end
+        task.wait(0.08)
+        if currentCharacter then gun = currentCharacter:FindFirstChild("Gun") or gun end
+        if not currentCharacter or gun.Parent ~= currentCharacter then
+            if showError then notify("A Gun não conseguiu ser equipada.", false) end
+            shootBusy = false
+            return false
+        end
+
         local remote = gunRemote(gun)
         local position = predictedPosition(player)
         if not remote or not position then
@@ -2249,12 +2268,16 @@ function Combat:Create(options)
             shootBusy = false
             return false
         end
-        local ok = pcall(function()
-            remote:InvokeServer(1, position, "AH2")
+        local ok, response = pcall(function()
+            return remote:InvokeServer(1, position, "AH2")
         end)
         shootBusy = false
         if showError then
-            notify(ok and "Shot sent directly to Murderer." or "Could not fire the Gun remote.", ok)
+            if ok then
+                notify("Tiro direto enviado para " .. player.Name .. ".", true)
+            else
+                notify("A Gun recusou o disparo: " .. tostring(response), false)
+            end
         end
         return ok
     end
