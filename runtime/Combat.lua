@@ -674,10 +674,51 @@ function Combat:Create(options)
         local namecallHooked = enablePerfectShotHook()
         local mouseHooked = enablePerfectMouseHook()
         if not namecallHooked and not mouseHooked then
-            if showError then
-                notify("Remote mudou e este executor não oferece hook para capturar o tiro.", false)
+            local position = predictedPosition(player)
+            local camera = Workspace.CurrentCamera
+            if not position or not camera then
+                if showError then notify("Não foi possível calcular a mira nativa.", false) end
+                return false
             end
-            return false
+
+            local originalCamera = camera.CFrame
+            local originalMouseX, originalMouseY = localMouse.X, localMouse.Y
+            local movedWith = nil
+            local aimOk, aimError = pcall(function()
+                camera.CFrame = CFrame.lookAt(originalCamera.Position, position)
+                RunService.RenderStepped:Wait()
+
+                local screenPoint = camera:WorldToViewportPoint(position)
+                if type(mousemoveabs) == "function" then
+                    mousemoveabs(screenPoint.X, screenPoint.Y)
+                    movedWith = "absolute"
+                elseif type(mousemoverel) == "function" then
+                    mousemoverel(screenPoint.X - localMouse.X, screenPoint.Y - localMouse.Y)
+                    movedWith = "relative"
+                end
+
+                RunService.RenderStepped:Wait()
+                gun:Activate()
+                RunService.RenderStepped:Wait()
+            end)
+
+            camera.CFrame = originalCamera
+            pcall(function()
+                if movedWith == "absolute" and type(mousemoveabs) == "function" then
+                    mousemoveabs(originalMouseX, originalMouseY)
+                elseif movedWith == "relative" and type(mousemoverel) == "function" then
+                    mousemoverel(originalMouseX - localMouse.X, originalMouseY - localMouse.Y)
+                end
+            end)
+
+            if showError then
+                if aimOk then
+                    notify("Gun acionada com mira nativa em " .. player.Name .. ".", true)
+                else
+                    notify("Falha ao mirar a Gun: " .. tostring(aimError), false)
+                end
+            end
+            return aimOk
         end
 
         forcedShotPlayer = player
