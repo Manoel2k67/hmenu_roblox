@@ -73,6 +73,9 @@ function Combat:Create(options)
     local perfectInvokeHookState = nil
     local perfectMouseHookState = nil
     local perfectMouseHookHandler = nil
+    local nativeGunShotAt = nil
+    local forcedShotPlayer = nil
+    local shotCaptureUntil = 0
     local suppressedGunConnections = {}
     local nativeGunSuppressed = false
 
@@ -373,10 +376,18 @@ function Combat:Create(options)
 
         local remote = gunRemote(gun)
         local position = predictedPosition(player)
-        if not remote or not position then
-            if showError then notify("Gun shot remote or target part was not found.", false) end
+        if not position then
+            if showError then notify("O corpo do Murderer não foi encontrado.", false) end
             shootBusy = false
             return false
+        end
+        if not remote then
+            local activated = nativeGunShotAt and nativeGunShotAt(gun, player, showError) or false
+            shootBusy = false
+            if not activated and showError and not nativeGunShotAt then
+                notify("Remote da Gun não encontrado e fallback indisponível.", false)
+            end
+            return activated
         end
         local ok, response = pcall(function()
             if remote:IsA("RemoteFunction") then
@@ -470,7 +481,8 @@ function Combat:Create(options)
     end
 
     perfectHookHandler = function(remote, ...)
-        if destroyed or not settings.SheriffPerfectShots then
+        local forcedActive = forcedShotPlayer ~= nil and tick() <= shotCaptureUntil
+        if destroyed or (not settings.SheriffPerfectShots and not forcedActive) then
             return false
         end
         local args = table.pack(...)
@@ -479,9 +491,12 @@ function Combat:Create(options)
             and args[1] == 1
             and args[3] == "AH2"
             and toolIn(localPlayer, "Gun") ~= nil
-        if not hasMM2Signature and not remoteLooksLikeGunShot(remote) then return false end
+        local insideShotWindow = tick() <= shotCaptureUntil and toolIn(localPlayer, "Gun") ~= nil
+        if not hasMM2Signature and not remoteLooksLikeGunShot(remote) and not insideShotWindow then
+            return false
+        end
 
-        local murderer = findMurderer()
+        local murderer = forcedActive and forcedShotPlayer or findMurderer()
         local position = murderer and predictedPosition(murderer)
         if not position then return false end
 
@@ -502,6 +517,13 @@ function Combat:Create(options)
                 args[index] = CFrame.new(position)
                 lastPerfectRedirect = tick()
                 return true, args
+            elseif argumentType == "Ray" then
+                local origin = args[index].Origin
+                if (position - origin).Magnitude > 0.01 then
+                    args[index] = Ray.new(origin, (position - origin).Unit * 1000)
+                    lastPerfectRedirect = tick()
+                    return true, args
+                end
             end
         end
         return false
@@ -611,14 +633,15 @@ function Combat:Create(options)
     end
 
     perfectMouseHookHandler = function(object, key)
-        if destroyed or not settings.SheriffPerfectShots or object ~= localMouse then
+        local forcedActive = forcedShotPlayer ~= nil and tick() <= shotCaptureUntil
+        if destroyed or (not settings.SheriffPerfectShots and not forcedActive) or object ~= localMouse then
             return false
         end
         if key ~= "Hit" and key ~= "Target" and key ~= "UnitRay" then
             return false
         end
 
-        local murderer = findMurderer()
+        local murderer = forcedActive and forcedShotPlayer or findMurderer()
         local part = murderer and targetPartFor(murderer)
         local position = murderer and predictedPosition(murderer)
         if not part or not position then return false end
@@ -645,6 +668,42 @@ function Combat:Create(options)
         if type(state) == "table" and state.Handler == perfectMouseHookHandler then
             state.Handler = nil
         end
+    end
+
+    nativeGunShotAt = function(gun, player, showError)
+        local namecallHooked = enablePerfectShotHook()
+        local mouseHooked = enablePerfectMouseHook()
+        if not namecallHooked and not mouseHooked then
+            if showError then
+                notify("Remote mudou e este executor não oferece hook para capturar o tiro.", false)
+            end
+            return false
+        end
+
+        forcedShotPlayer = player
+        shotCaptureUntil = tick() + 0.8
+        local redirectBefore = lastPerfectRedirect
+        local ok, activationError = pcall(function() gun:Activate() end)
+        if not ok then
+            forcedShotPlayer = nil
+            shotCaptureUntil = 0
+            if showError then notify("Não foi possível ativar a Gun: " .. tostring(activationError), false) end
+            return false
+        end
+
+        task.delay(0.25, function()
+            local redirected = lastPerfectRedirect > redirectBefore
+            if forcedShotPlayer == player then forcedShotPlayer = nil end
+            if tick() >= shotCaptureUntil then shotCaptureUntil = 0 end
+            if showError and not destroyed then
+                if redirected then
+                    notify("Tiro real capturado e redirecionado para " .. player.Name .. ".", true)
+                else
+                    notify("A Gun ativou, mas o executor não capturou o disparo.", false)
+                end
+            end
+        end)
+        return true
     end
 
     local function restoreGunConnections()
@@ -689,6 +748,7 @@ function Combat:Create(options)
         local now = tick()
         if now - lastPerfectShot < 0.15 then return end
         lastPerfectShot = now
+        shotCaptureUntil = now + 0.5
 
         -- Raw mouse input is a fallback for executors/gun versions where
         -- Tool.Activated or a metamethod hook is not exposed reliably.
