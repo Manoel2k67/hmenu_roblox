@@ -18,49 +18,69 @@ local function fling(targetPlayer, requireTouchEnabled)
 		return false
 	end
 
+	local character, root, humanoid = livingCharacter(localPlayer)
 	local targetCharacter, targetRoot, targetHumanoid =
 		livingCharacter(targetPlayer)
 
-	local localCharacter, localRoot, localHumanoid =
-		livingCharacter(localPlayer)
-
-	if not targetCharacter or not localCharacter then
+	if not character or not root or not humanoid
+		or not targetCharacter or not targetRoot or not targetHumanoid then
 		return false
 	end
 
-	if localRoot.Anchored or localHumanoid.SeatPart then
+	if root.Anchored or targetRoot.Anchored
+		or humanoid.SeatPart or targetHumanoid.SeatPart then
 		return false
 	end
 
-	-- Valores conservadores para reduzir a perda de controle.
-	-- Aumentar estes valores não garante lançar o alvo.
-	local MAX_LINEAR_SPEED = 85
-	local ANGULAR_SPEED = 120
-	local MAX_SEPARATION = 35
-	local MAX_TARGET_SPEED = 180
+	local DURATION = 0.65
+	local COOLDOWN = tonumber(TARGET_DEBOUNCE) or 0.8
+	local MAX_SPEED = 85
+	local MAX_TARGET_SPEED = 120
+	local MAX_DISTANCE = 18
 
-	local originalPivot = localCharacter:GetPivot()
-	local originalAutoRotate = localHumanoid.AutoRotate
+	local originalPivot = character:GetPivot()
+	local originalRoot = root.CFrame
+	local originalAutoRotate = humanoid.AutoRotate
+	local pivotToRoot = originalPivot:ToObjectSpace(originalRoot)
 
 	local parts = {}
-	for _, instance in ipairs(localCharacter:GetDescendants()) do
-		if instance:IsA("BasePart") then
-			table.insert(parts, instance)
+	for _, part in ipairs(character:GetDescendants()) do
+		if part:IsA("BasePart") then
+			parts[#parts + 1] = part
 		end
+	end
+
+	-- Manter o mesmo lado durante a tentativa.
+	local offset = root.Position - targetRoot.Position
+	local side = Vector3.new(offset.X, 0, offset.Z)
+
+	if side.Magnitude < 0.01 then
+		side = Vector3.new(1, 0, 0)
+	else
+		side = side.Unit
 	end
 
 	actionToken += 1
 	local token = actionToken
-	local restored = false
 	local startedAt = os.clock()
-	local step = 0
+	local restored = false
+	local moved = false
+	local watchdog
 
 	flinging = true
-	targetDebounce[targetPlayer] = now + TARGET_DEBOUNCE
+	targetDebounce[targetPlayer] = now + COOLDOWN
+
+	local function sameCharacter()
+		return localPlayer.Character == character
+			and character:IsDescendantOf(Workspace)
+			and root:IsDescendantOf(character)
+			and humanoid:IsDescendantOf(character)
+			and humanoid.Health > 0
+	end
 
 	local function zeroVelocity()
 		for _, part in ipairs(parts) do
-			if part.Parent then
+			if part:IsDescendantOf(character) then
 				pcall(function()
 					part.AssemblyLinearVelocity = Vector3.zero
 					part.AssemblyAngularVelocity = Vector3.zero
@@ -69,50 +89,80 @@ local function fling(targetPlayer, requireTouchEnabled)
 		end
 	end
 
+	local function returnToOrigin()
+		if not sameCharacter() then
+			return
+		end
+
+		zeroVelocity()
+		character:PivotTo(originalPivot)
+		zeroVelocity()
+	end
+
 	local function restore()
 		if restored then
 			return
 		end
+
 		restored = true
 
-		-- Uma tarefa antiga não deve restaurar sobre outra ação.
+		if watchdog then
+			watchdog:Disconnect()
+			watchdog = nil
+		end
+
+		-- Não interferir em outra ação.
 		if activeRestore ~= restore then
 			return
 		end
 
-		zeroVelocity()
-
 		pcall(function()
-			-- Nunca teletransportar o personagem novo após respawn.
-			if localPlayer.Character == localCharacter
-				and localCharacter.Parent
-				and localHumanoid.Health > 0 then
-				localCharacter:PivotTo(originalPivot)
+			if moved then
+				returnToOrigin()
 			end
 		end)
 
 		pcall(function()
-			if localHumanoid.Parent then
-				localHumanoid.AutoRotate = originalAutoRotate
+			if humanoid.Parent then
+				humanoid.AutoRotate = originalAutoRotate
+			end
 
-				if localPlayer.Character == localCharacter
-					and localHumanoid.Health > 0 then
-					localHumanoid:ChangeState(
-						Enum.HumanoidStateType.GettingUp
-					)
-				end
+			if moved and sameCharacter() then
+				humanoid:ChangeState(
+					Enum.HumanoidStateType.GettingUp
+				)
 			end
 		end)
-
-		zeroVelocity()
 
 		if targetPlayer.Parent == Players then
-			targetDebounce[targetPlayer] =
-				os.clock() + TARGET_DEBOUNCE
+			targetDebounce[targetPlayer] = os.clock() + COOLDOWN
+		else
+			targetDebounce[targetPlayer] = nil
 		end
 
 		activeRestore = nil
 		flinging = false
+
+		-- Corrigir movimento residual sem afetar uma ação nova.
+		if moved then
+			task.spawn(function()
+				for _ = 1, 6 do
+					RunService.PostSimulation:Wait()
+
+					if destroyed
+						or token ~= actionToken
+						or flinging
+						or not sameCharacter() then
+						return
+					end
+
+					local ok = pcall(returnToOrigin)
+					if not ok then
+						return
+					end
+				end
+			end)
+		end
 	end
 
 	activeRestore = restore
@@ -126,106 +176,113 @@ local function fling(targetPlayer, requireTouchEnabled)
 			return false
 		end
 
-		if os.clock() - startedAt >= FLING_DURATION then
+		if os.clock() - startedAt >= DURATION then
 			return false
 		end
 
-		if targetPlayer.Parent ~= Players then
+		if not sameCharacter() then
 			return false
 		end
 
-		local character, root, humanoid =
-			livingCharacter(localPlayer)
+		if targetPlayer.Parent ~= Players
+			or targetPlayer.Character ~= targetCharacter
+			or not targetCharacter:IsDescendantOf(Workspace)
+			or not targetRoot:IsDescendantOf(targetCharacter)
+			or not targetHumanoid:IsDescendantOf(targetCharacter)
+			or targetHumanoid.Health <= 0 then
+			return false
+		end
 
-		local target, rootTarget, humanoidTarget =
-			livingCharacter(targetPlayer)
-
-		return character == localCharacter
-			and root == localRoot
-			and humanoid == localHumanoid
-			and target == targetCharacter
-			and rootTarget == targetRoot
-			and humanoidTarget == targetHumanoid
-			and not localRoot.Anchored
+		return not root.Anchored
 			and not targetRoot.Anchored
-			and not localHumanoid.SeatPart
+			and not humanoid.SeatPart
+			and not targetHumanoid.SeatPart
 	end
+
+	local function unsafe()
+		if not moved then
+			return false
+		end
+
+		return root.Position.Y < Workspace.FallenPartsDestroyHeight + 60
+			or root.Position.Y < originalRoot.Position.Y - 25
+			or (root.Position - targetRoot.Position).Magnitude > MAX_DISTANCE
+			or root.AssemblyLinearVelocity.Magnitude > 150
+			or targetRoot.AssemblyLinearVelocity.Magnitude > MAX_TARGET_SPEED
+	end
+
+	-- Verificar também depois da simulação física.
+	watchdog = RunService.PostSimulation:Connect(function()
+		local ok, stop = pcall(function()
+			return not valid() or unsafe()
+		end)
+
+		if not ok or stop then
+			restore()
+		end
+	end)
 
 	task.spawn(function()
 		local ok, err = pcall(function()
-			-- Pode ter sido cancelado antes de task.spawn executar.
 			if not valid() then
 				return
 			end
 
-			localHumanoid.AutoRotate = false
+			humanoid.AutoRotate = false
 
 			while valid() do
 				RunService.PreSimulation:Wait()
 
-				-- Revalidar depois de qualquer espera.
-				if not valid() then
+				if not valid() or unsafe() then
 					break
 				end
 
-				local targetVelocity =
-					targetRoot.AssemblyLinearVelocity
-
+				local targetVelocity = targetRoot.AssemblyLinearVelocity
 				if targetVelocity.Magnitude > MAX_TARGET_SPEED then
 					break
 				end
 
-				if localRoot.Position.Y
-					< Workspace.FallenPartsDestroyHeight + 25 then
-					break
+				-- Previsão horizontal curta e limitada.
+				local prediction = Vector3.new(
+					targetVelocity.X,
+					0,
+					targetVelocity.Z
+				) * 0.025
+
+				if prediction.Magnitude > 1 then
+					prediction = prediction.Unit
 				end
 
-				-- Ignorar distância inicial: o alvo pode estar longe.
-				if step > 0
-					and (localRoot.Position - targetRoot.Position).Magnitude
-						> MAX_SEPARATION then
+				local predicted = targetRoot.Position + prediction
+				local position = predicted + side * 1.15
+					+ Vector3.new(0, 0.35, 0)
+
+				-- Não iniciar uma tentativa perto do vazio.
+				if position.Y < Workspace.FallenPartsDestroyHeight + 60
+					or position.Y < originalRoot.Position.Y - 25 then
 					break
 				end
-
-				step += 1
-
-				local predicted = targetRoot.Position
-					+ targetVelocity * PREDICTION_TIME
-
-				-- Evitar offsets abaixo do piso.
-				local side = step % 2 == 0 and 1 or -1
-				local position = predicted
-					+ Vector3.new(side * 1.5, 0.5, 0)
-
-				local towardTarget = predicted - position
-				local direction = towardTarget.Magnitude > 0.001
-					and towardTarget.Unit
-					or Vector3.new(1, 0, 0)
-
-				zeroVelocity()
-
-				-- Posicionar a raiz considerando o pivot real do modelo.
-				local pivotToRoot =
-					localCharacter:GetPivot():ToObjectSpace(localRoot.CFrame)
 
 				local desiredRoot = CFrame.new(position)
-					* originalPivot.Rotation
+					* originalRoot.Rotation
 
-				localCharacter:PivotTo(
+				moved = true
+				zeroVelocity()
+
+				character:PivotTo(
 					desiredRoot * pivotToRoot:Inverse()
 				)
 
 				local velocity = targetVelocity
-					+ direction * 55
-					+ Vector3.new(0, 12, 0)
+					- side * 50
+					+ Vector3.new(0, 8, 0)
 
-				if velocity.Magnitude > MAX_LINEAR_SPEED then
-					velocity = velocity.Unit * MAX_LINEAR_SPEED
+				if velocity.Magnitude > MAX_SPEED then
+					velocity = velocity.Unit * MAX_SPEED
 				end
 
-				localRoot.AssemblyLinearVelocity = velocity
-				localRoot.AssemblyAngularVelocity =
-					Vector3.new(0, ANGULAR_SPEED * side, 0)
+				root.AssemblyLinearVelocity = velocity
+				root.AssemblyAngularVelocity = Vector3.new(0, 80, 0)
 			end
 		end)
 
@@ -236,5 +293,13 @@ local function fling(targetPlayer, requireTouchEnabled)
 		end
 	end)
 
+	-- Retaguarda caso a rotina principal não finalize normalmente.
+	task.delay(DURATION + 0.2, function()
+		if not restored and activeRestore == restore then
+			restore()
+		end
+	end)
+
+	-- true significa tentativa iniciada, não alvo lançado.
 	return true
 end
