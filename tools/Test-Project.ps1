@@ -53,6 +53,25 @@ if ($luaSource -match 'HttpGet\([^\r\n]*os\.time\(') {
     $failures.Add("Cache-buster dinamico com os.time() encontrado em uma chamada HttpGet.")
 }
 
+foreach ($runtimeFile in $textFiles | Where-Object {
+    $_.Extension -in @(".lua", ".luau") -and $_.FullName.StartsWith((Join-Path $repoRoot "runtime"))
+}) {
+    $runtimeSource = $strictUtf8.GetString([IO.File]::ReadAllBytes($runtimeFile.FullName))
+    $relativePath = $runtimeFile.FullName.Substring($repoRoot.Length).TrimStart('\', '/')
+    if ($runtimeSource -notmatch 'function\s+[A-Za-z_][A-Za-z0-9_]*:Create\s*\(') {
+        $failures.Add("Runtime sem Create: $relativePath")
+    }
+    if ($runtimeSource -notmatch 'function\s+runtime:Set\s*\(') {
+        $failures.Add("Runtime sem Set: $relativePath")
+    }
+    if ($runtimeSource -notmatch 'function\s+runtime:Destroy\s*\(') {
+        $failures.Add("Runtime sem Destroy: $relativePath")
+    }
+    if ($runtimeSource -notmatch '(?m)^return\s+[A-Za-z_][A-Za-z0-9_]*\s*$') {
+        $failures.Add("Runtime sem retorno de modulo: $relativePath")
+    }
+}
+
 foreach ($wallpaper in Get-ChildItem -LiteralPath (Join-Path $repoRoot "theme\wallpapers") -Filter "*.png" -File) {
     $bytes = [IO.File]::ReadAllBytes($wallpaper.FullName)
     $signature = @(0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A)
