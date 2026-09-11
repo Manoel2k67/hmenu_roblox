@@ -1548,6 +1548,23 @@ return {
             Icon = "fire",
             Controls = {
                 {
+                    Kind = "Dropdown",
+                    Setting = "SelectedPlayer",
+                    OptionsSource = "Players",
+                    UseList = true,
+                    Id = "troll_target_player",
+                    Label = "Target Player",
+                    Default = "Select a player",
+                },
+                {
+                    Kind = "Button",
+                    Setting = "FlingSelected",
+                    Id = "fling_selected",
+                    Label = "Fling Target",
+                    Description = "Arremessa o jogador selecionado para fora do mapa e retorna você à posição inicial.",
+                    ButtonText = "Fling",
+                },
+                {
                     Kind = "Toggle",
                     Setting = "TouchFling",
                     Id = "touch_fling",
@@ -1881,6 +1898,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
 local Combat = {}
@@ -2523,6 +2541,26 @@ function Combat:Create(options)
         boundGun = nil
     end
 
+    local function schedulePerfectShot()
+        if destroyed or not settings.SheriffPerfectShots then return end
+        local currentCharacter = character()
+        if not currentCharacter or not currentCharacter:FindFirstChild("Gun") then return end
+
+        local now = tick()
+        if now - lastPerfectShot < 0.15 then return end
+        lastPerfectShot = now
+
+        -- Raw mouse input is a fallback for executors/gun versions where
+        -- Tool.Activated or a metamethod hook is not exposed reliably.
+        task.defer(function()
+            if destroyed or not settings.SheriffPerfectShots then return end
+            if not nativeGunSuppressed and tick() - lastPerfectRedirect < 0.12 then return end
+            refreshRoles()
+            local murderer = findMurderer()
+            if murderer then fireGunAt(murderer, false) end
+        end)
+    end
+
     local function bindGunActivation()
         if not settings.SheriffPerfectShots then
             if gunActivationConnection or #suppressedGunConnections > 0 then disconnectGunActivation() end
@@ -2541,22 +2579,7 @@ function Combat:Create(options)
             nativeGunSuppressed = suppressGunConnections(gun)
         end
         gunActivationConnection = gun.Activated:Connect(function()
-            if destroyed or not settings.SheriffPerfectShots then return end
-            local now = tick()
-            if now - lastPerfectShot < 0.15 then return end
-            lastPerfectShot = now
-
-            -- Tool.Activated is also a per-shot safety net. A hook being installed
-            -- does not guarantee that a particular game remote was recognized.
-            -- Defer until the Gun's own Activated callbacks have had the chance to
-            -- invoke the remote, then only send a direct shot if no redirect occurred.
-            task.defer(function()
-                if destroyed or not settings.SheriffPerfectShots then return end
-                if not nativeGunSuppressed and tick() - lastPerfectRedirect < 0.12 then return end
-                refreshRoles()
-                local murderer = findMurderer()
-                if murderer then fireGunAt(murderer, false) end
-            end)
+            schedulePerfectShot()
         end)
     end
 
@@ -2862,6 +2885,11 @@ function Combat:Create(options)
     end
 
     local roleElapsed, mainElapsed, hitboxElapsed, grabElapsed = 0, 0, 0, 0
+    connect(UserInputService.InputBegan, function(input, processed)
+        if not processed and input.UserInputType == Enum.UserInputType.MouseButton1 then
+            schedulePerfectShot()
+        end
+    end)
     connect(RunService.Heartbeat, function(deltaTime)
         if destroyed then return end
         roleElapsed = roleElapsed + deltaTime
@@ -4250,6 +4278,7 @@ end
 __modules["runtime/Troll.lua"] = function()
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
 
 local TrollRuntime = {}
 
@@ -4268,9 +4297,10 @@ function TrollRuntime:Create()
     local actionToken = 0
     local flinging = false
     local activeRestore
-    local impulseMarker = {}
 
     local settings = {
+        SelectedPlayer = "Select a player",
+        FlingSelected = false,
         TouchFling = false,
     }
 
@@ -4287,14 +4317,15 @@ function TrollRuntime:Create()
         end
     end
 
-    local function livingRoot(character)
+    local function livingCharacter(player)
+        local character = player and player.Character
         if not character then return nil end
         local humanoid = character:FindFirstChildOfClass("Humanoid")
-        local root = character:FindFirstChild("HumanoidRootPart")
+        local root = character:FindFirstChild("HumanoidRootPart") or (humanoid and humanoid.RootPart)
         if not humanoid or humanoid.Health <= 0 or not root or not root:IsA("BasePart") then
             return nil
         end
-        return root, humanoid
+        return character, root, humanoid
     end
 
     local function playerFromPart(part)
@@ -4309,37 +4340,57 @@ function TrollRuntime:Create()
         return nil
     end
 
-    local function fling(targetPlayer)
-        if destroyed or not settings.TouchFling or flinging or not targetPlayer or targetPlayer == localPlayer then return end
+    local function selectedPlayer()
+        local name = settings.SelectedPlayer
+        if type(name) ~= "string" or name == "Select a player" then return nil end
+        return Players:FindFirstChild(name)
+    end
+
+    local function fling(targetPlayer, requireTouchEnabled)
+        if destroyed or flinging or not targetPlayer or targetPlayer == localPlayer then return false end
+        if requireTouchEnabled and not settings.TouchFling then return false end
 
         local now = os.clock()
-        if (targetDebounce[targetPlayer] or 0) > now then return end
+        if (targetDebounce[targetPlayer] or 0) > now then return false end
+
+        local targetCharacter, targetRoot, targetHumanoid = livingCharacter(targetPlayer)
+        local localCharacter, localRoot, localHumanoid = livingCharacter(localPlayer)
+        if not targetCharacter or not targetRoot or not targetHumanoid
+            or not localCharacter or not localRoot or not localHumanoid then
+            return false
+        end
+
         targetDebounce[targetPlayer] = now + 1
-
-        local targetRoot, targetHumanoid = livingRoot(targetPlayer.Character)
-        local localRoot = livingRoot(localPlayer.Character)
-        if not targetRoot or not targetHumanoid or not localRoot then return end
-        if targetPlayer.Character == localPlayer.Character then return end
-
         flinging = true
-        _G.__HMENU_TROLL_IMPULSE = impulseMarker
         actionToken = actionToken + 1
         local token = actionToken
-
-        local savedAutoRotate = targetHumanoid.AutoRotate
+        local originalPivot = localCharacter:GetPivot()
+        local originalAutoRotate = localHumanoid.AutoRotate
+        local camera = Workspace.CurrentCamera
+        local originalCameraSubject = camera and camera.CameraSubject
+        local mover
         local restored = false
 
         local function restore()
             if restored then return end
             restored = true
+            if mover and mover.Parent then mover:Destroy() end
 
-            -- Só restaura o AutoRotate do alvo (não mexe na velocidade dele)
-            if targetHumanoid and targetHumanoid.Parent then
-                targetHumanoid.AutoRotate = savedAutoRotate
+            if localCharacter and localCharacter.Parent then
+                for _, descendant in ipairs(localCharacter:GetDescendants()) do
+                    if descendant:IsA("BasePart") then
+                        descendant.AssemblyLinearVelocity = Vector3.zero
+                        descendant.AssemblyAngularVelocity = Vector3.zero
+                    end
+                end
+                pcall(function() localCharacter:PivotTo(originalPivot + Vector3.new(0, 0.5, 0)) end)
             end
-
-            if _G.__HMENU_TROLL_IMPULSE == impulseMarker then
-                _G.__HMENU_TROLL_IMPULSE = nil
+            if localHumanoid and localHumanoid.Parent then
+                localHumanoid.AutoRotate = originalAutoRotate
+                pcall(function() localHumanoid:ChangeState(Enum.HumanoidStateType.GettingUp) end)
+            end
+            if camera and camera.Parent then
+                camera.CameraSubject = originalCameraSubject or localHumanoid
             end
             if activeRestore == restore then activeRestore = nil end
             flinging = false
@@ -4348,63 +4399,72 @@ function TrollRuntime:Create()
 
         task.spawn(function()
             local ok, err = pcall(function()
+                localHumanoid.AutoRotate = false
+                if camera then camera.CameraSubject = targetHumanoid end
+
+                mover = Instance.new("BodyVelocity")
+                mover.Name = "HMenuFlingVelocity"
+                mover.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+                mover.Velocity = Vector3.new(9e8, 9e8, 9e8)
+                mover.Parent = localRoot
+
                 local startedAt = os.clock()
-                targetHumanoid.AutoRotate = false
+                local angle = 0
+                while not destroyed and token == actionToken and os.clock() - startedAt < 2 do
+                    if requireTouchEnabled and not settings.TouchFling then break end
 
-                while not destroyed and settings.TouchFling and token == actionToken
-                    and os.clock() - startedAt < 0.28 do
-
-                    local currentTargetRoot = livingRoot(targetPlayer.Character)
-                    local currentLocalRoot = livingRoot(localPlayer.Character)
-                    if not currentTargetRoot or not currentLocalRoot then break end
-
-                    local horizontal = currentTargetRoot.Position - currentLocalRoot.Position
-                    horizontal = Vector3.new(horizontal.X, 0, horizontal.Z)
-
-                    if horizontal.Magnitude < 0.05 then
-                        horizontal = Vector3.new(currentLocalRoot.CFrame.LookVector.X, 0, currentLocalRoot.CFrame.LookVector.Z)
+                    local currentTargetCharacter, currentTargetRoot, currentTargetHumanoid = livingCharacter(targetPlayer)
+                    local currentLocalCharacter, currentLocalRoot = livingCharacter(localPlayer)
+                    if currentTargetCharacter ~= targetCharacter or not currentTargetRoot
+                        or not currentTargetHumanoid or not currentLocalCharacter or not currentLocalRoot then
+                        break
                     end
 
-                    local direction = horizontal.Magnitude > 0.05 and horizontal.Unit or Vector3.new(1, 0, 0)
+                    local targetVelocity = currentTargetRoot.AssemblyLinearVelocity.Magnitude
+                    if targetVelocity > 500 then break end
 
-                    -- Impulso forte só no alvo
-                    currentTargetRoot.AssemblyLinearVelocity = Vector3.new(
-                        direction.X * 11000,
-                        14000,
-                        direction.Z * 11000
-                    )
-                    currentTargetRoot.AssemblyAngularVelocity = Vector3.new(0, 100000, 0)
+                    angle = angle + 100
+                    local movement = currentTargetHumanoid.MoveDirection * (targetVelocity / 1.25)
+                    local offsets = {
+                        CFrame.new(0, 1.5, 0) + movement,
+                        CFrame.new(0, -1.5, 0) + movement,
+                        CFrame.new(2.25, 1.5, -2.25) + movement,
+                        CFrame.new(-2.25, -1.5, 2.25) + movement,
+                    }
 
-                    RunService.Heartbeat:Wait()
+                    for _, offset in ipairs(offsets) do
+                        if destroyed or token ~= actionToken then break end
+                        currentLocalCharacter:PivotTo(
+                            CFrame.new(currentTargetRoot.Position) * offset * CFrame.Angles(math.rad(angle), 0, 0)
+                        )
+                        currentLocalRoot.AssemblyLinearVelocity = Vector3.new(9e7, 9e8, 9e7)
+                        currentLocalRoot.AssemblyAngularVelocity = Vector3.new(9e8, 9e8, 9e8)
+                        RunService.Heartbeat:Wait()
+                    end
                 end
             end)
 
             restore()
-            if not ok then warn("[HMenu] Touch Fling error:", err) end
+            if not ok then warn("[HMenu] Fling error:", err) end
         end)
+        return true
     end
 
     local function onTouched(part)
         if destroyed or not settings.TouchFling or not part or not part.Parent then return end
         if localPlayer.Character and part:IsDescendantOf(localPlayer.Character) then return end
         local targetPlayer = playerFromPart(part)
-        if targetPlayer and targetPlayer ~= localPlayer then
-            fling(targetPlayer)
-        end
+        if targetPlayer and targetPlayer ~= localPlayer then fling(targetPlayer, true) end
     end
 
     local function watchPart(part)
-        if part:IsA("BasePart") then
-            connect(touchConnections, part.Touched, onTouched)
-        end
+        if part:IsA("BasePart") then connect(touchConnections, part.Touched, onTouched) end
     end
 
     local function bindCharacter(character)
         disconnectAll(touchConnections)
         if not settings.TouchFling or not character then return end
-        for _, descendant in ipairs(character:GetDescendants()) do
-            watchPart(descendant)
-        end
+        for _, descendant in ipairs(character:GetDescendants()) do watchPart(descendant) end
         connect(touchConnections, character.DescendantAdded, watchPart)
     end
 
@@ -4418,11 +4478,42 @@ function TrollRuntime:Create()
         end)
     end)
 
+    connect(connections, Players.PlayerRemoving, function(player)
+        targetDebounce[player] = nil
+        if player == selectedPlayer() then settings.SelectedPlayer = "Select a player" end
+    end)
+
+    function runtime:GetOptions(source)
+        if source ~= "Players" then return { "None" } end
+        local names = {}
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= localPlayer then table.insert(names, player.Name) end
+        end
+        table.sort(names, function(a, b) return string.lower(a) < string.lower(b) end)
+        if #names == 0 then return { "No players" } end
+        return names
+    end
+
     function runtime:Set(name, value)
         if destroyed or settings[name] == nil then return end
-        settings[name] = value == true
-        if name ~= "TouchFling" then return end
 
+        if name == "SelectedPlayer" then
+            settings.SelectedPlayer = tostring(value)
+            return
+        elseif name == "FlingSelected" then
+            settings.FlingSelected = false
+            if value == true then
+                local target = selectedPlayer()
+                if target then
+                    fling(target, false)
+                else
+                    warn("[HMenu] Select a valid player before using Fling Target.")
+                end
+            end
+            return
+        end
+
+        settings.TouchFling = value == true
         actionToken = actionToken + 1
         if activeRestore then activeRestore() end
         if settings.TouchFling then
@@ -4442,7 +4533,6 @@ function TrollRuntime:Create()
         disconnectAll(touchConnections)
         disconnectAll(connections)
         targetDebounce = {}
-        if _G.__HMENU_TROLL_IMPULSE == impulseMarker then _G.__HMENU_TROLL_IMPULSE = nil end
         if _G.__HMENU_TROLL_CLEANUP == cleanupFunction then _G.__HMENU_TROLL_CLEANUP = nil end
     end
 

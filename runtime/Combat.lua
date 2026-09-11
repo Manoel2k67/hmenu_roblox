@@ -2,6 +2,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
 local Combat = {}
@@ -644,6 +645,26 @@ function Combat:Create(options)
         boundGun = nil
     end
 
+    local function schedulePerfectShot()
+        if destroyed or not settings.SheriffPerfectShots then return end
+        local currentCharacter = character()
+        if not currentCharacter or not currentCharacter:FindFirstChild("Gun") then return end
+
+        local now = tick()
+        if now - lastPerfectShot < 0.15 then return end
+        lastPerfectShot = now
+
+        -- Raw mouse input is a fallback for executors/gun versions where
+        -- Tool.Activated or a metamethod hook is not exposed reliably.
+        task.defer(function()
+            if destroyed or not settings.SheriffPerfectShots then return end
+            if not nativeGunSuppressed and tick() - lastPerfectRedirect < 0.12 then return end
+            refreshRoles()
+            local murderer = findMurderer()
+            if murderer then fireGunAt(murderer, false) end
+        end)
+    end
+
     local function bindGunActivation()
         if not settings.SheriffPerfectShots then
             if gunActivationConnection or #suppressedGunConnections > 0 then disconnectGunActivation() end
@@ -662,22 +683,7 @@ function Combat:Create(options)
             nativeGunSuppressed = suppressGunConnections(gun)
         end
         gunActivationConnection = gun.Activated:Connect(function()
-            if destroyed or not settings.SheriffPerfectShots then return end
-            local now = tick()
-            if now - lastPerfectShot < 0.15 then return end
-            lastPerfectShot = now
-
-            -- Tool.Activated is also a per-shot safety net. A hook being installed
-            -- does not guarantee that a particular game remote was recognized.
-            -- Defer until the Gun's own Activated callbacks have had the chance to
-            -- invoke the remote, then only send a direct shot if no redirect occurred.
-            task.defer(function()
-                if destroyed or not settings.SheriffPerfectShots then return end
-                if not nativeGunSuppressed and tick() - lastPerfectRedirect < 0.12 then return end
-                refreshRoles()
-                local murderer = findMurderer()
-                if murderer then fireGunAt(murderer, false) end
-            end)
+            schedulePerfectShot()
         end)
     end
 
@@ -983,6 +989,11 @@ function Combat:Create(options)
     end
 
     local roleElapsed, mainElapsed, hitboxElapsed, grabElapsed = 0, 0, 0, 0
+    connect(UserInputService.InputBegan, function(input, processed)
+        if not processed and input.UserInputType == Enum.UserInputType.MouseButton1 then
+            schedulePerfectShot()
+        end
+    end)
     connect(RunService.Heartbeat, function(deltaTime)
         if destroyed then return end
         roleElapsed = roleElapsed + deltaTime
