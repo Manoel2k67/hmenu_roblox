@@ -110,14 +110,12 @@ function TrollRuntime:Create()
             return false
         end
 
-        if root.Anchored or targetRoot.Anchored
-            or humanoid.SeatPart or targetHumanoid.SeatPart then
+        if root.Anchored then
             return false
         end
 
         local duration = 1.1
         local cooldown = tonumber(TARGET_DEBOUNCE) or 0.8
-        local maxSpeed = 240
 
         local originalPivot = character:GetPivot()
         local originalRoot = root.CFrame
@@ -257,9 +255,27 @@ function TrollRuntime:Create()
             end
 
             return not root.Anchored
-                and not targetRoot.Anchored
-                and not humanoid.SeatPart
-                and not targetHumanoid.SeatPart
+        end
+
+        local function moveAgainstTarget()
+            local targetVelocity = targetRoot.AssemblyLinearVelocity
+            local prediction = Vector3.new(targetVelocity.X, 0, targetVelocity.Z) * 0.03
+            if prediction.Magnitude > 1 then prediction = prediction.Unit end
+
+            local position = targetRoot.Position + prediction + side * 0.9
+                + Vector3.new(0, 0.35, 0)
+            if position.Y < Workspace.FallenPartsDestroyHeight + 60 then return false end
+
+            local desiredRoot = CFrame.new(position) * originalRoot.Rotation
+            moved = true
+            character:PivotTo(desiredRoot * pivotToRoot:Inverse())
+            root.AssemblyLinearVelocity = targetVelocity - side * 220 + Vector3.new(0, 55, 0)
+            root.AssemblyAngularVelocity = Vector3.new(0, 3000, 0)
+            return true
+        end
+
+        if valid() then
+            moveAgainstTarget()
         end
 
         watchdog = RunService.PostSimulation:Connect(function()
@@ -279,40 +295,8 @@ function TrollRuntime:Create()
                     RunService.Heartbeat:Wait()
                     if not valid() then break end
 
-                    local targetVelocity = targetRoot.AssemblyLinearVelocity
-
-                    local prediction = Vector3.new(
-                        targetVelocity.X,
-                        0,
-                        targetVelocity.Z
-                    ) * 0.025
-                    if prediction.Magnitude > 1 then
-                        prediction = prediction.Unit
-                    end
-
-                    local predicted = targetRoot.Position + prediction
-                    local position = predicted + side * 1.05
-                        + Vector3.new(0, 0.35, 0)
-
-                    if position.Y < Workspace.FallenPartsDestroyHeight + 60 then
-                        break
-                    end
-
-                    local desiredRoot = CFrame.new(position) * originalRoot.Rotation
-
-                    moved = true
                     zeroVelocity()
-                    character:PivotTo(desiredRoot * pivotToRoot:Inverse())
-
-                    local velocity = targetVelocity
-                        - side * 180
-                        + Vector3.new(0, 35, 0)
-                    if velocity.Magnitude > maxSpeed then
-                        velocity = velocity.Unit * maxSpeed
-                    end
-
-                    root.AssemblyLinearVelocity = velocity
-                    root.AssemblyAngularVelocity = Vector3.new(0, 2500, 0)
+                    if not moveAgainstTarget() then break end
                 end
             end)
 
@@ -363,6 +347,22 @@ function TrollRuntime:Create()
         end
         connect(touchConnections, character.DescendantAdded, watchPart)
     end
+
+    connect(connections, RunService.Heartbeat, function()
+        if destroyed or not settings.TouchFling then return end
+        local _, root = livingCharacter(localPlayer)
+        if not root then return end
+
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= localPlayer then
+                local _, targetRoot = livingCharacter(player)
+                if targetRoot and (targetRoot.Position - root.Position).Magnitude <= 7 then
+                    fling(player, true)
+                    if flinging then return end
+                end
+            end
+        end
+    end)
 
     connect(connections, localPlayer.CharacterAdded, function(character)
         actionToken += 1
