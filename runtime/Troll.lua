@@ -114,8 +114,11 @@ function TrollRuntime:Create()
             return false
         end
 
-        local duration = 1.1
+        local duration = 1.6
         local cooldown = tonumber(TARGET_DEBOUNCE) or 0.8
+        local orbitRadius = 2.4
+        local orbitSpeed = 22
+        local orbitHeight = 1.1
 
         local originalPivot = character:GetPivot()
         local originalRoot = root.CFrame
@@ -140,6 +143,7 @@ function TrollRuntime:Create()
         actionToken += 1
         local token = actionToken
         local startedAt = os.clock()
+        local orbitAngle = math.atan2(side.Z, side.X)
         local restored = false
         local moved = false
         local watchdog
@@ -259,18 +263,27 @@ function TrollRuntime:Create()
 
         local function moveAgainstTarget()
             local targetVelocity = targetRoot.AssemblyLinearVelocity
-            local prediction = Vector3.new(targetVelocity.X, 0, targetVelocity.Z) * 0.03
-            if prediction.Magnitude > 1 then prediction = prediction.Unit end
-
-            local position = targetRoot.Position + prediction + side * 0.9
-                + Vector3.new(0, 0.35, 0)
+            local horizontalVelocity = Vector3.new(targetVelocity.X, 0, targetVelocity.Z)
+            local prediction = horizontalVelocity * 0.08
+            local elapsed = os.clock() - startedAt
+            orbitAngle = orbitAngle + orbitSpeed * 0.045
+            local radius = orbitRadius + math.sin(elapsed * 28) * 0.55
+            local height = orbitHeight + math.sin(elapsed * 22) * 1.15
+            local orbitOffset = Vector3.new(
+                math.cos(orbitAngle) * radius,
+                height,
+                math.sin(orbitAngle) * radius
+            )
+            local position = targetRoot.Position + prediction + orbitOffset
             if position.Y < Workspace.FallenPartsDestroyHeight + 60 then return false end
 
             local desiredRoot = CFrame.new(position) * originalRoot.Rotation
             moved = true
             character:PivotTo(desiredRoot * pivotToRoot:Inverse())
-            root.AssemblyLinearVelocity = targetVelocity - side * 220 + Vector3.new(0, 55, 0)
-            root.AssemblyAngularVelocity = Vector3.new(0, 3000, 0)
+            local tangent = Vector3.new(-math.sin(orbitAngle), 0, math.cos(orbitAngle))
+            local orbitVelocity = tangent * (orbitSpeed * radius)
+            root.AssemblyLinearVelocity = targetVelocity + orbitVelocity + Vector3.new(0, 65, 0)
+            root.AssemblyAngularVelocity = Vector3.new(0, 4200, 0)
             return true
         end
 
