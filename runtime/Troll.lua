@@ -115,11 +115,9 @@ function TrollRuntime:Create()
             return false
         end
 
-        local duration = 0.8
+        local duration = 1.1
         local cooldown = tonumber(TARGET_DEBOUNCE) or 0.8
         local maxSpeed = 240
-        local maxTargetSpeed = 350
-        local maxDistance = 24
 
         local originalPivot = character:GetPivot()
         local originalRoot = root.CFrame
@@ -264,19 +262,9 @@ function TrollRuntime:Create()
                 and not targetHumanoid.SeatPart
         end
 
-        local function unsafe()
-            if not moved then return false end
-
-            return root.Position.Y < Workspace.FallenPartsDestroyHeight + 60
-                or root.Position.Y < originalRoot.Position.Y - 25
-                or (root.Position - targetRoot.Position).Magnitude > maxDistance
-                or root.AssemblyLinearVelocity.Magnitude > 150
-                or targetRoot.AssemblyLinearVelocity.Magnitude > maxTargetSpeed
-        end
-
         watchdog = RunService.PostSimulation:Connect(function()
             local ok, stop = pcall(function()
-                return not valid() or unsafe()
+                return not valid()
             end)
             if not ok or stop then restore() end
         end)
@@ -288,11 +276,10 @@ function TrollRuntime:Create()
                 humanoid.AutoRotate = false
 
                 while valid() do
-                    RunService.PreSimulation:Wait()
-                    if not valid() or unsafe() then break end
+                    RunService.Heartbeat:Wait()
+                    if not valid() then break end
 
                     local targetVelocity = targetRoot.AssemblyLinearVelocity
-                    if targetVelocity.Magnitude > maxTargetSpeed then break end
 
                     local prediction = Vector3.new(
                         targetVelocity.X,
@@ -307,8 +294,7 @@ function TrollRuntime:Create()
                     local position = predicted + side * 1.05
                         + Vector3.new(0, 0.35, 0)
 
-                    if position.Y < Workspace.FallenPartsDestroyHeight + 60
-                        or position.Y < originalRoot.Position.Y - 25 then
+                    if position.Y < Workspace.FallenPartsDestroyHeight + 60 then
                         break
                     end
 
