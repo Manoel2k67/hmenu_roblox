@@ -33,7 +33,7 @@ local GUI_NAME = "HMenuKeySystem"
 local LICENSE_API_URL = "https://m2kshop.com/api/licenses/validate"
 local PRODUCT_SLUG = "roblox-murder-mystery-2-mm2-script"
 local LICENSE_API_CONFIGURED = LICENSE_API_URL:match("^https://") ~= nil
-local GET_KEY_URL = "https://m2kshop.com/products/roblox-murder-mystery-2-mm2-script"
+local GET_KEY_URL = "https://m2kshop.com/"
 local HAS_KEY_URL = type(GET_KEY_URL) == "string" and string.match(GET_KEY_URL, "^https://") ~= nil
 
 if type(_G.__HMENU_KEY_CLEANUP) == "function" then
@@ -85,7 +85,7 @@ local overlay = new("Frame", {
 
 local window = new("Frame", {
     Name = "Window", AnchorPoint = Vector2.new(0.5, 0.5),
-    Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(410, 276),
+    Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(410, 332),
     BackgroundColor3 = Color3.fromRGB(24, 35, 60), BackgroundTransparency = 0.08,
     BorderSizePixel = 0, ClipsDescendants = true,
 }, overlay)
@@ -100,7 +100,7 @@ new("UIGradient", {
 
 new("TextLabel", {
     Size = UDim2.new(1, -62, 0, 28), Position = UDim2.fromOffset(22, 17),
-    BackgroundTransparency = 1, Text = "HMenu  |  Access v" .. RELEASE_VERSION,
+    BackgroundTransparency = 1, Text = "Menu MM2  |  Access v" .. RELEASE_VERSION,
     TextColor3 = Color3.fromRGB(239, 244, 255), Font = Enum.Font.GothamMedium,
     TextSize = 15, TextXAlignment = Enum.TextXAlignment.Left,
 }, window)
@@ -146,17 +146,35 @@ local submit = new("TextButton", {
 }, window)
 round(submit, 7)
 local getKey = new("TextButton", {
-    Size = UDim2.fromOffset(150, 25), Position = UDim2.fromOffset(17, 239),
-    BackgroundTransparency = 1, Text = "Obter chave / comunidade",
-    TextColor3 = Color3.fromRGB(130, 168, 242), Font = Enum.Font.Gotham,
-    TextSize = 11, AutoButtonColor = false, Visible = HAS_KEY_URL,
+    Name = "CopySite", Size = UDim2.new(1, -44, 0, 48), Position = UDim2.fromOffset(22, 242),
+    BackgroundColor3 = Color3.fromRGB(27, 43, 73), BorderSizePixel = 0,
+    Text = "", AutoButtonColor = false, Visible = HAS_KEY_URL,
 }, window)
+round(getKey, 8)
+stroke(getKey, Color3.fromRGB(83, 112, 169), 0.48)
+-- Lucide SVG copy icon, published as a Roblox image asset (same icon set as the menu).
+local copyIcon = new("ImageLabel", {
+    Name = "CopyIcon", Size = UDim2.fromOffset(18, 18), Position = UDim2.new(0, 13, 0.5, -9),
+    BackgroundTransparency = 1, Image = "rbxassetid://7733764083",
+    ImageColor3 = Color3.fromRGB(150, 185, 255),
+}, getKey)
+new("TextLabel", {
+    Size = UDim2.new(1, -139, 1, 0), Position = UDim2.fromOffset(42, 0),
+    BackgroundTransparency = 1, Text = GET_KEY_URL,
+    TextColor3 = Color3.fromRGB(220, 231, 255), Font = Enum.Font.GothamMedium,
+    TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left,
+}, getKey)
+local copyAction = new("TextLabel", {
+    Size = UDim2.fromOffset(80, 48), Position = UDim2.new(1, -93, 0, 0),
+    BackgroundTransparency = 1, Text = "Copiar site",
+    TextColor3 = Color3.fromRGB(150, 185, 255), Font = Enum.Font.GothamMedium,
+    TextSize = 11, TextXAlignment = Enum.TextXAlignment.Right,
+}, getKey)
 local status = new("TextLabel", {
-    Size = HAS_KEY_URL and UDim2.new(1, -190, 0, 25) or UDim2.new(1, -44, 0, 25),
-    Position = HAS_KEY_URL and UDim2.new(0, 169, 0, 239) or UDim2.fromOffset(22, 239),
+    Size = UDim2.new(1, -44, 0, 25), Position = UDim2.fromOffset(22, 298),
     BackgroundTransparency = 1, Text = "A chave será validada online",
     TextColor3 = Color3.fromRGB(128, 145, 178), Font = Enum.Font.Gotham,
-    TextSize = 10, TextXAlignment = HAS_KEY_URL and Enum.TextXAlignment.Right or Enum.TextXAlignment.Center,
+    TextSize = 10, TextXAlignment = Enum.TextXAlignment.Center,
 }, window)
 
 local busy = false
@@ -368,14 +386,33 @@ end
 connect(submit.MouseButton1Click, openMenu)
 connect(input.FocusLost, function(enterPressed) if enterPressed then openMenu() end end)
 connect(close.MouseButton1Click, cleanup)
-connect(getKey.MouseButton1Click, function()
-    if not HAS_KEY_URL then return end
-    if type(setclipboard) == "function" then
-        setclipboard(GET_KEY_URL)
-        setStatus("Link copiado", Color3.fromRGB(105, 221, 160))
-    else
-        setStatus(GET_KEY_URL, Color3.fromRGB(130, 168, 242))
+local copyFeedbackId = 0
+connect(getKey.Activated, function()
+    if not HAS_KEY_URL or destroyed then return end
+    local copied = type(setclipboard) == "function" and pcall(setclipboard, GET_KEY_URL)
+    if not copied then
+        if not busy then
+            setStatus("Copie o endereço do site acima", Color3.fromRGB(255, 177, 98))
+        end
+        return
     end
+    copyFeedbackId = copyFeedbackId + 1
+    local feedbackId = copyFeedbackId
+    copyAction.Text = "Copiado!"
+    copyAction.TextColor3 = Color3.fromRGB(105, 221, 160)
+    copyIcon.ImageColor3 = Color3.fromRGB(105, 221, 160)
+    task.delay(2, function()
+        if destroyed or feedbackId ~= copyFeedbackId then return end
+        copyAction.Text = "Copiar site"
+        copyAction.TextColor3 = Color3.fromRGB(150, 185, 255)
+        copyIcon.ImageColor3 = Color3.fromRGB(150, 185, 255)
+    end)
+end)
+connect(getKey.MouseEnter, function()
+    TweenService:Create(getKey, TweenInfo.new(0.12), { BackgroundColor3 = Color3.fromRGB(37, 57, 94) }):Play()
+end)
+connect(getKey.MouseLeave, function()
+    TweenService:Create(getKey, TweenInfo.new(0.12), { BackgroundColor3 = Color3.fromRGB(27, 43, 73) }):Play()
 end)
 connect(submit.MouseEnter, function()
     TweenService:Create(submit, TweenInfo.new(0.12), { BackgroundColor3 = Color3.fromRGB(108, 153, 239) }):Play()

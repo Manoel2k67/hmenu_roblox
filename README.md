@@ -1,4 +1,4 @@
-# HMenu Roblox
+# Menu MM2 Roblox
 
 Interface modular em Luau com sistema de acesso, categorias independentes, runtimes com ciclo de vida controlado e bundle de distribuição.
 
@@ -121,6 +121,6 @@ a identidade do jogador contra um cliente modificado. Nenhum segredo está no Lu
 O executor precisa oferecer uma função de requisição HTTPS POST (`syn.request`,
 `request`, `http_request` ou `http.request`). Sem ela, o menu recusa a validação.
 
-Defina `GET_KEY_URL` com uma URL HTTPS válida para exibir o botão **Obter chave / comunidade**. Enquanto esse valor estiver vazio, o botão permanece oculto e nenhum link fictício é mostrado ao usuário.
+O botão **Copiar site** exibe `https://m2kshop.com/` ao lado do ícone Lucide de duas folhas e confirma a cópia com **Copiado!**. O ícone SVG usa o asset de imagem publicado para Roblox, como os demais ícones do menu. Defina `GET_KEY_URL` com uma URL HTTPS válida para exibir o botão; enquanto esse valor estiver vazio, o botão permanece oculto.
 
 Uma chave validada inteiramente no cliente pode ser lida ou alterada. Para controle de acesso real, use uma API HTTPS sob seu controle, aplique expiração e limitação de tentativas no servidor e nunca inclua segredos no script ou no repositório.

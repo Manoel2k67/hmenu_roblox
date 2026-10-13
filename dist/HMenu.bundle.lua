@@ -8,7 +8,7 @@ local __modules = {}
 __modules["HMenuConfig.lua"] = function()
 local Config = {}
 
-Config.GuiName = "HMenu"
+Config.GuiName = "Menu MM2"
 Config.Version = "v" .. tostring(rawget(_G, "__HMENU_RELEASE_VERSION") or "unknown")
 Config.ToggleKey = Enum.KeyCode.RightShift
 Config.DefaultCategory = "Main"
@@ -543,7 +543,7 @@ function HMenu:Create(options)
         Name = "Header", Size = UDim2.new(1, 0, 0, 54), BackgroundColor3 = Theme.Header,
         BackgroundTransparency = 0.22, BorderSizePixel = 0, Active = true, ZIndex = 2,
     }, root)
-    text(header, "HMenu " .. Config.Version, {
+    text(header, Config.GuiName .. " " .. Config.Version, {
         Size = UDim2.fromOffset(230, 54), Position = UDim2.fromOffset(20, 0),
         TextColor3 = Theme.Muted, Font = Enum.Font.Gotham, TextSize = 12,
         TextXAlignment = Enum.TextXAlignment.Left,
@@ -1327,8 +1327,8 @@ return {
     Id = "Credits", Label = "Credits", Icon = "info", Bookmarked = false,
     Sections = {
         { Title = "About", Icon = "info", Controls = {
-            { Kind = "Paragraph", Label = "HMenu v" .. releaseVersion, Description = "Interface modular criada para manutenção simples e expansão por categorias." },
-            { Kind = "Paragraph", Label = "Desenvolvimento", Description = "Manoel2k67 / HMenu" },
+            { Kind = "Paragraph", Label = "Menu MM2 v" .. releaseVersion, Description = "Interface modular criada para manutenção simples e expansão por categorias." },
+            { Kind = "Paragraph", Label = "Desenvolvimento", Description = "Manoel2k67 / Menu MM2" },
             {
                 Kind = "Button",
                 Id = "copy_community",
@@ -1410,7 +1410,7 @@ return {
     Id = "Main", Label = "Main", Icon = "home", Bookmarked = false,
     Sections = {
         { Title = "Overview", Icon = "overview", Controls = {
-            { Kind = "Paragraph", Label = "HMenu está pronto", Description = "Interface modular carregada com dados de demonstração." },
+            { Kind = "Paragraph", Label = "Menu MM2 está pronto", Description = "Interface modular carregada com dados de demonstração." },
             { Kind = "Dropdown", Id = "profile", Label = "Perfil ativo", Options = { "Default", "Performance", "Custom" }, Default = "Default" },
             { Kind = "Button", Id = "save_profile", Label = "Salvar preferências", ButtonText = "Salvar" },
         }},

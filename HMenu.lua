@@ -253,7 +253,7 @@ function HMenu:Create(options)
         Name = "Header", Size = UDim2.new(1, 0, 0, 54), BackgroundColor3 = Theme.Header,
         BackgroundTransparency = 0.22, BorderSizePixel = 0, Active = true, ZIndex = 2,
     }, root)
-    text(header, "HMenu " .. Config.Version, {
+    text(header, Config.GuiName .. " " .. Config.Version, {
         Size = UDim2.fromOffset(230, 54), Position = UDim2.fromOffset(20, 0),
         TextColor3 = Theme.Muted, Font = Enum.Font.Gotham, TextSize = 12,
         TextXAlignment = Enum.TextXAlignment.Left,

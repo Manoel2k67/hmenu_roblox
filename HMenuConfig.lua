@@ -1,6 +1,6 @@
 local Config = {}
 
-Config.GuiName = "HMenu"
+Config.GuiName = "Menu MM2"
 Config.Version = "v" .. tostring(rawget(_G, "__HMENU_RELEASE_VERSION") or "unknown")
 Config.ToggleKey = Enum.KeyCode.RightShift
 Config.DefaultCategory = "Main"

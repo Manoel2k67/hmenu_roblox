@@ -4,8 +4,8 @@ return {
     Id = "Credits", Label = "Credits", Icon = "info", Bookmarked = false,
     Sections = {
         { Title = "About", Icon = "info", Controls = {
-            { Kind = "Paragraph", Label = "HMenu v" .. releaseVersion, Description = "Interface modular criada para manutenção simples e expansão por categorias." },
-            { Kind = "Paragraph", Label = "Desenvolvimento", Description = "Manoel2k67 / HMenu" },
+            { Kind = "Paragraph", Label = "Menu MM2 v" .. releaseVersion, Description = "Interface modular criada para manutenção simples e expansão por categorias." },
+            { Kind = "Paragraph", Label = "Desenvolvimento", Description = "Manoel2k67 / Menu MM2" },
             {
                 Kind = "Button",
                 Id = "copy_community",
