@@ -33,7 +33,7 @@ local GUI_NAME = "HMenuKeySystem"
 local LICENSE_API_URL = "https://m2kshop.com/api/licenses/validate"
 local PRODUCT_SLUG = "roblox-murder-mystery-2-mm2-script"
 local LICENSE_API_CONFIGURED = LICENSE_API_URL:match("^https://") ~= nil
-local GET_KEY_URL = "https://m2kshop.com/"
+local GET_KEY_URL = "https://m2kshop.com/products/roblox-murder-mystery-2-mm2-script"
 local HAS_KEY_URL = type(GET_KEY_URL) == "string" and string.match(GET_KEY_URL, "^https://") ~= nil
 
 if type(_G.__HMENU_KEY_CLEANUP) == "function" then
@@ -147,12 +147,10 @@ local submit = new("TextButton", {
 round(submit, 7)
 local getKey = new("TextButton", {
     Size = UDim2.fromOffset(150, 25), Position = UDim2.fromOffset(17, 239),
-    BackgroundColor3 = Color3.fromRGB(43, 68, 112), Text = "Copiar link do site",
-    TextColor3 = Color3.fromRGB(226, 236, 255), Font = Enum.Font.GothamMedium,
-    TextSize = 10, AutoButtonColor = false, Visible = HAS_KEY_URL,
+    BackgroundTransparency = 1, Text = "Obter chave / comunidade",
+    TextColor3 = Color3.fromRGB(130, 168, 242), Font = Enum.Font.Gotham,
+    TextSize = 11, AutoButtonColor = false, Visible = HAS_KEY_URL,
 }, window)
-round(getKey, 6)
-stroke(getKey, Color3.fromRGB(91, 127, 190), 0.35)
 local status = new("TextLabel", {
     Size = HAS_KEY_URL and UDim2.new(1, -190, 0, 25) or UDim2.new(1, -44, 0, 25),
     Position = HAS_KEY_URL and UDim2.new(0, 169, 0, 239) or UDim2.fromOffset(22, 239),
@@ -372,17 +370,11 @@ connect(input.FocusLost, function(enterPressed) if enterPressed then openMenu() 
 connect(close.MouseButton1Click, cleanup)
 connect(getKey.MouseButton1Click, function()
     if not HAS_KEY_URL then return end
-    local copyToClipboard = type(setclipboard) == "function" and setclipboard
-        or type(toclipboard) == "function" and toclipboard
-    if not copyToClipboard then
-        setStatus("Clipboard indisponível", Color3.fromRGB(255, 190, 105))
-        return
-    end
-    local copied = pcall(copyToClipboard, GET_KEY_URL)
-    if copied then
+    if type(setclipboard) == "function" then
+        setclipboard(GET_KEY_URL)
         setStatus("Link copiado", Color3.fromRGB(105, 221, 160))
     else
-        setStatus("Falha ao copiar link", Color3.fromRGB(255, 113, 122))
+        setStatus(GET_KEY_URL, Color3.fromRGB(130, 168, 242))
     end
 end)
 connect(submit.MouseEnter, function()
