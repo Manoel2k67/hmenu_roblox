@@ -106,9 +106,17 @@ O workflow `.github/workflows/validate.yml` executa essas validações automatic
 ## Chaves e segurança
 
 O `KeySystem.lua` valida a chave via `POST /api/licenses/validate`, usando o slug
-`script-murder-mistery-2`. A URL pública atual da API é
-`https://m2kscripts-backend.onrender.com/api/licenses/validate`. `localhost` não pode
+`roblox-murder-mystery-2-mm2-script`. A URL pública atual da API é
+`https://m2kshop.com/api/licenses/validate`. `localhost` não pode
 ser acessado pelo Roblox.
+
+O corpo JSON contém `key`, `productSlug` e `robloxUserId` (o `UserId` do jogador,
+convertido em string). Resposta de sucesso: `{"valid":true}` com `expiresAt`
+opcional. Falhas usam `not_found`, `revoked`, `expired` ou `bound_other`.
+HTTP 429 exige esperar um minuto; o menu não repete automaticamente a chamada.
+A chave fica vinculada ao ID declarado no primeiro uso aprovado. Como o executor
+controla essa declaração, isso evita compartilhamento casual, mas não comprova
+a identidade do jogador contra um cliente modificado. Nenhum segredo está no Lua.
 
 O executor precisa oferecer uma função de requisição HTTPS POST (`syn.request`,
 `request`, `http_request` ou `http.request`). Sem ela, o menu recusa a validação.

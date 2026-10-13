@@ -30,10 +30,10 @@ _G.__HMENU_RELEASE_VERSION = RELEASE_VERSION
 local MAX_DOWNLOAD_ATTEMPTS = 4
 local RETRY_BASE_DELAY = 0.75
 local GUI_NAME = "HMenuKeySystem"
-local LICENSE_API_URL = "https://m2kscripts-backend.onrender.com/api/licenses/validate"
-local PRODUCT_SLUG = "script-murder-mistery-2"
+local LICENSE_API_URL = "https://m2kshop.com/api/licenses/validate"
+local PRODUCT_SLUG = "roblox-murder-mystery-2-mm2-script"
 local LICENSE_API_CONFIGURED = LICENSE_API_URL:match("^https://") ~= nil
-local GET_KEY_URL = "https://m2kscripts-frontend.vercel.app/"
+local GET_KEY_URL = "https://m2kshop.com/products/roblox-murder-mystery-2-mm2-script"
 local HAS_KEY_URL = type(GET_KEY_URL) == "string" and string.match(GET_KEY_URL, "^https://") ~= nil
 
 if type(_G.__HMENU_KEY_CLEANUP) == "function" then
@@ -186,7 +186,7 @@ local function validateLicense(key)
     local body = HttpService:JSONEncode({
         key = key:match("^%s*(.-)%s*$"),
         productSlug = PRODUCT_SLUG,
-        deviceId = "roblox-user-" .. tostring(Players.LocalPlayer.UserId),
+        robloxUserId = tostring(Players.LocalPlayer.UserId),
     })
     local ok, response = pcall(requestFunction, {
         Url = LICENSE_API_URL,
@@ -199,6 +199,9 @@ local function validateLicense(key)
     end
 
     local statusCode = tonumber(response.StatusCode or response.Status)
+    if statusCode == 429 then
+        return false, "muitas tentativas; aguarde um minuto"
+    end
     if statusCode and (statusCode < 200 or statusCode >= 300) then
         return false, "API recusou a validação (" .. tostring(statusCode) .. ")"
     end
@@ -210,11 +213,10 @@ local function validateLicense(key)
     end
     if result.valid ~= true then
         local reasons = {
-            invalid_request = "dados inválidos",
-            invalid_key = "chave inválida",
-            disabled = "licença desativada",
+            not_found = "chave inválida para este produto",
+            revoked = "licença revogada",
             expired = "licença expirada",
-            device_mismatch = "chave vinculada a outro usuário",
+            bound_other = "chave vinculada a outro usuário",
         }
         return false, reasons[result.reason] or "chave não autorizada"
     end
